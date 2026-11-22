@@ -72,6 +72,13 @@ const wName = (/** @type {LayerId} */ id, /** @type {number} */ o, /** @type {nu
   const [m, ch] = inputsOf(id)[i];
   return `w[${mapName(LAYERS[id].to, o)}←${mapName(m, ch)}]`;
 };
+/** A weight's or bias's short name, for the editor. @param {Exclude<Selection, { kind: 'neuron' }>} sel */
+export const paramLabel = sel => {
+  const L = LAYERS[sel.layer];
+  return sel.kind === 'bias'
+    ? `bias b[${mapName(L.to, sel.o)}]`
+    : `${wName(sel.layer, sel.o, sel.i)}, kernel row ${Math.floor(sel.k / L.ks)}, column ${sel.k % L.ks}`;
+};
 /** @param {MapName} m @param {Trace} T */
 const fwdMap = (m, T) => /** @type {Float64Array[]} */ (T[m]);
 

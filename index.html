@@ -30,6 +30,10 @@
     <p><b>Step through it.</b> ➡️ step does one stage: the forward pass layer by layer, then the
       backward pass layer by layer, then the weight update. Tap any neuron or weight to see the exact
       arithmetic behind it. With 📍 follow on, each step selects a neuron it just computed.</p>
+    <p><b>Move a weight yourself.</b> Tap a weight or bias, then drag the ✏️ slider. The current
+      sample’s forward pass reruns with the new value, so every map, the output, the loss and the test
+      images respond as you drag. ↩️ puts it back. On a wide screen, drag the bars between the panels
+      to resize them.</p>
     <p><b>See why it is shaped like a U.</b> Pick a task, ▶️ play until it learns, then switch off one
       of the two paths into the decoder, press 🔄 new weights, and train again. 🔲 outline needs the
       skip connection; 🔍 big only needs the bottleneck.</p>
@@ -46,11 +50,11 @@
     <button data-on="click:actions.pause" data-disabled="views.pauseLocked">⏸️ pause</button>
     <button data-on="click:actions.reset">🔄 new weights</button>
   </span>
-  <label>samples <output data-text="views.samples"></output></label>
+  <label id="count">samples <output data-text="views.samples"></output></label>
 </header>
 
 <main>
-  <div class="col" id="colA">
+  <section id="left">
     <fieldset id="trainBox">
       <legend>training</legend>
       <div>task:
@@ -68,7 +72,6 @@
       <div><label for="speedIn">play speed <output data-text="views.speed"></output><br>
         <input id="speedIn" type="range" min="-4" max="10" step="1" data-bind="train.speed"></label></div>
     </fieldset>
-
     <fieldset id="viewBox">
       <legend>view</legend>
       <div>colour by:
@@ -79,7 +82,6 @@
       <div><label><input type="checkbox" data-bind="ui.follow"> 📍 follow each step</label></div>
       <div><label><input type="checkbox" data-bind="ui.noCss"> 🚫 no CSS</label></div>
     </fieldset>
-
     <fieldset id="keyBox">
       <legend>key</legend>
       <div>🟦 positive, 🟥 negative; stronger colour, bigger number. Blank: not computed yet.</div>
@@ -89,37 +91,52 @@
         🟧 through the skip connection, both colours: both.</div>
       <div>Each map is scaled to its own largest value; the inspector has the exact numbers.</div>
     </fieldset>
-  </div>
-
-  <div class="col" id="colB">
+  </section>
+  <div class="split" data-split="left" role="separator" aria-orientation="vertical" aria-label="resize the left panel" tabindex="0"></div>
+  <section id="centre">
     <fieldset id="netBox">
       <legend>network: tap a neuron</legend>
       <svg id="net" role="img" aria-label="the U-net: every neuron of every map"></svg>
     </fieldset>
+  </section>
+  <div class="split" data-split="right" role="separator" aria-orientation="vertical" aria-label="resize the right panel" tabindex="0"></div>
+  <section id="right">
+    <fieldset id="editBox">
+      <legend>✏️ edit a weight</legend>
+      <div class="line">editing: <output data-text="views.editName"></output></div>
+      <div><label for="editIn">value <output data-text="views.editValue"></output><br>
+        <input id="editIn" type="range" min="-4" max="4" step="0.01" data-bind="edit.value" data-on="input:actions.nudge" data-disabled="views.editLocked"></label></div>
+      <div>
+        <button data-on="click:actions.restore" data-disabled="views.restoreLocked">↩️ put this one back</button>
+        <button data-on="click:actions.undoAll" data-disabled="views.undoLocked">⏪ undo all edits</button>
+      </div>
+      <div class="line">edited: <output data-text="views.edited"></output></div>
+      <p><small>Moving a weight reruns this sample’s forward pass with it: watch the maps, the output, the loss and the test images.</small></p>
+    </fieldset>
+    <fieldset id="inspBox">
+      <legend>🔍 inspector</legend>
+      <div class="stage">done: <output data-text="views.done"></output></div>
+      <div class="stage">next: <output data-text="views.next"></output></div>
+      <pre data-text="views.inspect"></pre>
+    </fieldset>
+  </section>
+  <div class="split" data-split="bottom" role="separator" aria-orientation="horizontal" aria-label="resize the bottom panel" tabindex="0"></div>
+  <section id="bottom">
     <fieldset id="weightBox">
       <legend>weights: tap one</legend>
       <svg id="weights" role="img" aria-label="every weight and bias"></svg>
     </fieldset>
-  </div>
-
-  <div class="col" id="colC">
-    <fieldset id="inspBox">
-      <legend>🔍 inspector</legend>
-      <div>done: <output data-text="views.done"></output></div>
-      <div>next: <output data-text="views.next"></output></div>
-      <pre data-text="views.inspect"></pre>
-    </fieldset>
     <fieldset id="lossBox">
       <legend>loss</legend>
-      <div>this sample <output data-text="views.loss"></output> · last 200 <output data-text="views.avgLoss"></output> · chart top <output data-text="views.chartTop"></output></div>
+      <div class="line">this sample <output data-text="views.loss"></output> · last 200 <output data-text="views.avgLoss"></output> · chart top <output data-text="views.chartTop"></output></div>
       <svg id="loss" role="img" aria-label="loss per sample over training"></svg>
     </fieldset>
     <fieldset id="testBox">
       <legend>test images</legend>
-      <div><output data-text="views.test"></output></div>
+      <div class="line"><output data-text="views.test"></output></div>
       <svg id="tests" role="img" aria-label="four test images: input, output, target"></svg>
     </fieldset>
-  </div>
+  </section>
 </main>
 
 </body>

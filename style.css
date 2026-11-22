@@ -1,51 +1,89 @@
-/* Structure only: three columns on a wide screen, one on a phone, and drawings that fill their
-   fieldset. Every control renders with browser defaults. The page follows the OS theme. */
+/* Structure only. Every control renders with browser defaults; the page follows the OS theme.
+   The rule that keeps the page still: no panel takes its size from content that changes while
+   training. Panels have fixed sizes and scroll inside; one-line readouts never wrap. */
 
 :root {
   color-scheme: light dark;
   --page: light-dark(#ffffff, #000000);
   --panel: light-dark(#eeeeee, #111111);
+  --bar: light-dark(#cccccc, #333333);
   --gap: 8px;
+  --left: 270px;
+  --right: 400px;
+  --bottom: 250px;
 }
 
 body { background-color: var(--page); margin: 0; }
 
 #top {
-  position: sticky; top: 0; z-index: 1;
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--gap);
   padding: 4px var(--gap);
   background: var(--panel);
 }
+#count output { display: inline-block; min-width: 6ch; font-variant-numeric: tabular-nums; }
 [popover] { max-width: 40em; border-radius: 5px; }
-
-main {
-  display: grid;
-  grid-template-columns: 260px minmax(320px, 520px) minmax(340px, 1fr);
-  gap: var(--gap);
-  padding: var(--gap);
-  align-items: start;
-}
-.col { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
 
 fieldset { background: var(--panel); border-radius: 5px; margin: 0; min-width: 0; }
 fieldset > div { margin: 2px 0; }
+.line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage { font-size: small; line-height: 1.3; height: 2.6em; overflow: hidden; } /* always two lines tall, whatever the stage */
+input[type=range] { width: 100%; max-width: 24em; }
 
 svg { display: block; width: 100%; height: auto; }
-#loss { height: 100px; }
+pre { font-size: 11px; line-height: 1.35; overflow: auto; margin: 4px 0 0; }
 
-pre { font-size: 11px; line-height: 1.35; overflow-x: auto; margin: 4px 0 0; }
+.split { display: none; }
 
-/* phones: one column, the network and the inspector first */
-@media (max-width: 900px) {
-  main { display: flex; flex-direction: column; align-items: stretch; }
-  .col { display: contents; }
+/* wide screens: left | centre | right, with the bottom panel under the centre and right.
+   The bars between them are the splitters; their sizes are CSS variables the drag sets. */
+@media (min-width: 900px) {
+  body { height: 100dvh; display: flex; flex-direction: column; }
+  main {
+    flex: 1; min-height: 0;
+    display: grid;
+    padding: 0 var(--gap) var(--gap);
+    grid-template-columns: clamp(160px, var(--left), 45vw) var(--gap) minmax(0, 1fr) var(--gap) clamp(160px, var(--right), 45vw);
+    grid-template-rows: minmax(0, 1fr) var(--gap) clamp(100px, var(--bottom), 70vh);
+    grid-template-areas:
+      "left lbar centre rbar right"
+      "left lbar bbar   bbar bbar"
+      "left lbar bottom bottom bottom";
+  }
+  main > section { min-width: 0; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: var(--gap); padding-top: var(--gap); }
+  #left { grid-area: left; }
+  #centre { grid-area: centre; }
+  #right { grid-area: right; }
+  #bottom { grid-area: bottom; flex-direction: row; padding-top: 0; }
+
+  .split { display: block; touch-action: none; background: linear-gradient(var(--bar), var(--bar)) center / 2px 100% no-repeat; }
+  [data-split=bottom] { background-size: 100% 2px; }
+  .split:hover, .split:focus-visible { background: var(--bar); }
+  [data-split=left] { grid-area: lbar; cursor: col-resize; }
+  [data-split=right] { grid-area: rbar; cursor: col-resize; }
+  [data-split=bottom] { grid-area: bbar; cursor: row-resize; }
+
+  /* the drawings fill their panel, scaled to fit */
+  #netBox, #inspBox, #bottom > fieldset { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+  #netBox svg, #bottom svg { flex: 1; min-height: 0; height: 100%; }
+  #inspBox pre { flex: 1; min-height: 0; }
+}
+
+/* phones: one column, in the order you use it. The network, the weight editor and the weights
+   sit together so you can drag a weight and watch the network. The inspector has a fixed height
+   and scrolls inside, so its text can change at every step without moving the page. */
+@media (max-width: 899.98px) {
+  #top { position: sticky; top: 0; z-index: 1; }
+  main { display: flex; flex-direction: column; gap: var(--gap); padding: var(--gap); }
+  main > section { display: contents; }
   #netBox { order: 1; }
-  #inspBox { order: 2; }
-  #trainBox { order: 3; }
-  #weightBox { order: 4; }
-  #lossBox { order: 5; }
-  #testBox { order: 6; }
-  #viewBox { order: 7; }
-  #keyBox { order: 8; }
-  pre { font-size: 10px; }
+  #editBox { order: 2; }
+  #weightBox { order: 3; }
+  #inspBox { order: 4; }
+  #trainBox { order: 5; }
+  #lossBox { order: 6; }
+  #testBox { order: 7; }
+  #viewBox { order: 8; }
+  #keyBox { order: 9; }
+  #loss { height: 100px; }
+  pre { font-size: 10px; height: 24em; }
 }

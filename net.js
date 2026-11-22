@@ -306,5 +306,22 @@ export function apply(P, G, alpha) {
   return /** @type {Params} */ (Object.fromEntries(LAYER_IDS.map(id => [id, step(id)])));
 }
 
+/**
+ * One weight or bias by address: { layer, o, i, k } is weight k of kernel w[o][i]; { layer, o } is bias b[o].
+ * @typedef {{ layer: LayerId, o: number, i?: number, k?: number }} ParamAddress
+ */
+
+/** @param {Params} P @param {ParamAddress} a */
+export const getParam = (P, a) => (a.i === undefined ? P[a.layer].b[a.o] : P[a.layer].w[a.o][a.i][a.k ?? 0]);
+
+/** New params with one weight or bias set to v; every other layer is shared, not copied. @param {Params} P @param {ParamAddress} a @param {number} v */
+export function setParam(P, a, v) {
+  const L = P[a.layer];
+  const layer = a.i === undefined
+    ? { w: L.w, b: L.b.map((x, o) => (o === a.o ? v : x)) }
+    : { b: L.b, w: L.w.map((row, o) => (o !== a.o ? row : row.map((k, i) => (i !== a.i ? k : k.map((x, j) => (j === a.k ? v : x)))))) };
+  return { ...P, [a.layer]: layer };
+}
+
 /** Fraction of pixels the network gets right (output rounded to 0 or 1). @param {Trace} T */
 export const accuracy = T => T.y[0].reduce((a, v, j) => a + (Math.round(v) === T.t[0][j] ? 1 : 0), 0) / (N * N);

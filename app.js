@@ -3,7 +3,7 @@
 import { signal, computed, effect, batch, untracked, bind, series } from 'plainpanel';
 import * as net from './net.js';
 import { TASKS, sample } from './data.js';
-import { STAGES, LAST, FWD, BACK, WGRAD, explain, highlight } from './explain.js';
+import { STAGES, LAST, FWD, BACK, WGRAD, explain, highlight, paramLabel } from './explain.js';
 import { createNetView, createWeightView, createTestView, createLossView } from './view.js';
 
 /** @typedef {import('./view.js').Selection} Selection */
@@ -34,6 +34,24 @@ const ui = {
   field: signal(true), // show the receptive field
   follow: signal(true), // each step selects a neuron in the map it computed
   noCss: signal(false),
+};
+const edit = {
+  value: signal(0), // the selected weight's value, as the slider shows it
+  orig: signal(/** @type {Map<string, number>} */ (new Map())), // what each hand-edited weight was before you moved it
+};
+// panel sizes in px, set by dragging the splitters (wide screens only)
+const SIZES = { left: 270, right: 400, bottom: 250 };
+const saved = (() => {
+  try {
+    return { ...SIZES, ...JSON.parse(localStorage.getItem('unet-layout') ?? '{}') };
+  } catch {
+    return SIZES;
+  }
+})();
+const layout = {
+  left: signal(/** @type {number} */ (saved.left)),
+  right: signal(/** @type {number} */ (saved.right)),
+  bottom: signal(/** @type {number} */ (saved.bottom)),
 };
 const losses = series(20000);
 const TEST_COUNT = 32;
@@ -105,6 +123,21 @@ const views = {
   inspect: computed(() => explain(ui.sel(), ctx())),
   stepLocked: computed(() => state.playing()),
   pauseLocked: computed(() => !state.playing()),
+  editName: computed(() => {
+    const s = ui.sel();
+    return s && s.kind !== 'neuron' ? paramLabel(s) : 'nothing yet: tap a weight or bias';
+  }),
+  editValue: computed(() => edit.value().toFixed(2)),
+  editLocked: computed(() => state.playing() || ui.sel()?.kind === 'neuron' || !ui.sel()),
+  restoreLocked: computed(() => {
+    const s = ui.sel();
+    return state.playing() || !s || s.kind === 'neuron' || !edit.orig().has(keyOf(s));
+  }),
+  undoLocked: computed(() => state.playing() || edit.orig().size === 0),
+  edited: computed(() => {
+    const n = edit.orig().size;
+    return n === 0 ? 'none' : `${n} weight${n === 1 ? '' : 's'} (the next update clears this)`;
+  }),
 };
 
 // ── training ──
@@ -127,6 +160,7 @@ function stepStage() {
     const P = state.params();
     state.before(P);
     state.params(net.apply(P, /** @type {net.Grads} */ (state.grads()).w, train.alpha()));
+    if (edit.orig().size) edit.orig(new Map()); // training has moved every weight: "put it back" no longer means much
     state.samples(state.samples() + 1);
     losses.push(/** @type {net.Trace} */ (state.trace()).loss);
   }
@@ -153,7 +187,63 @@ function followStep() {
   ui.sel({ kind: 'neuron', map: m, ch: Math.min(from.ch, net.CH[m] - 1), r: scale(from.r), c: scale(from.c) });
 }
 
+// ── editing a weight by hand ──
+
+const keyOf = (/** @type {net.ParamAddress} */ a) => `${a.layer} ${a.o} ${a.i ?? 'b'} ${a.k ?? ''}`;
+
+/** Use hand-edited weights, then redo this sample's forward pass with them, so every map, the output and the tests follow. */
+function useParams(/** @type {net.Params} */ P) {
+  state.params(P);
+  state.before(null);
+  const T0 = state.trace();
+  if (!T0) return;
+  const T = net.forward(P, T0.x[0], T0.t[0], { skip: train.skip(), deep: train.deep() });
+  state.trace(T);
+  state.grads(net.backward(P, T));
+  state.stage(FWD.y); // forward pass done; the next step starts the backward pass
+  ui.mode('value');
+}
+const setWeight = (/** @type {net.ParamAddress} */ a, /** @type {number} */ v) => useParams(net.setParam(state.params(), a, v));
+
+const selectedParam = () => {
+  const s = ui.sel();
+  return s && s.kind !== 'neuron' ? /** @type {net.ParamAddress} */ (s) : null;
+};
+
 const actions = {
+  /** the slider moved */
+  nudge: (/** @type {Event} */ e) => {
+    const a = selectedParam();
+    if (!a) return;
+    const v = /** @type {HTMLInputElement} */ (e.target).valueAsNumber;
+    batch(() => {
+      const key = keyOf(a);
+      if (!edit.orig().has(key)) edit.orig(new Map(edit.orig()).set(key, net.getParam(state.params(), a)));
+      setWeight(a, v);
+    });
+  },
+  restore: () => {
+    const a = selectedParam();
+    if (!a) return;
+    const was = edit.orig().get(keyOf(a));
+    if (was === undefined) return;
+    batch(() => {
+      const left = new Map(edit.orig());
+      left.delete(keyOf(a));
+      edit.orig(left);
+      setWeight(a, was);
+    });
+  },
+  undoAll: () =>
+    batch(() => {
+      let P = state.params();
+      for (const [key, was] of edit.orig()) {
+        const [layer, o, i, k] = key.split(' ');
+        P = net.setParam(P, /** @type {net.ParamAddress} */ (i === 'b' ? { layer, o: +o } : { layer, o: +o, i: +i, k: +k }), was);
+      }
+      edit.orig(new Map());
+      useParams(P);
+    }),
   step: () =>
     batch(() => {
       stepStage();
@@ -170,6 +260,7 @@ const actions = {
     batch(() => {
       state.playing(false);
       state.params(net.init());
+      edit.orig(new Map());
       state.samples(0);
       losses.clear();
       load();
@@ -204,9 +295,52 @@ effect(() => {
   else untracked(() => batch(load));
 });
 
+// the slider shows the selected weight's current value: on selecting it, and as training moves it
+effect(() => {
+  const a = selectedParam();
+  if (a) edit.value(net.getParam(state.params(), a));
+});
+
+// the panel sizes, into the CSS grid (and remembered in this browser)
+const main = /** @type {HTMLElement} */ (document.querySelector('main'));
+effect(() => {
+  const sizes = { left: layout.left(), right: layout.right(), bottom: layout.bottom() };
+  for (const [k, v] of Object.entries(sizes)) main.style.setProperty(`--${k}`, `${v}px`);
+  try {
+    localStorage.setItem('unet-layout', JSON.stringify(sizes));
+  } catch {}
+});
+
+// the splitters: a drag (or the arrow keys) is one write to that panel's size
+for (const bar of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-split]'))) {
+  const side = /** @type {keyof typeof layout} */ (bar.dataset.split);
+  const panel = /** @type {HTMLElement} */ (document.getElementById(side));
+  const across = side === 'bottom';
+  const grow = side === 'left' ? 1 : -1; // the left panel grows rightwards; the right one leftwards, the bottom one upwards
+  const size = () => (across ? panel.offsetHeight : panel.offsetWidth);
+  const limit = (/** @type {number} */ v) => Math.round(Math.max(across ? 100 : 160, Math.min(v, (across ? 0.7 * innerHeight : 0.45 * innerWidth))));
+  /** @type {{ at: number, from: number } | null} */
+  let drag = null;
+  const pos = (/** @type {PointerEvent} */ e) => (across ? e.clientY : e.clientX);
+  bar.addEventListener('pointerdown', e => {
+    bar.setPointerCapture(e.pointerId);
+    drag = { at: pos(e), from: size() };
+  });
+  bar.addEventListener('pointermove', e => {
+    if (drag) layout[side](limit(drag.from + grow * (pos(e) - drag.at)));
+  });
+  bar.addEventListener('lostpointercapture', () => (drag = null));
+  bar.addEventListener('keydown', e => {
+    const step = { ArrowLeft: -16, ArrowUp: -16, ArrowRight: 16, ArrowDown: 16 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    layout[side](limit(size() + grow * step));
+  });
+}
+
 // ── page ──
 
-bind(document.body, { state, train, ui, views, actions });
+bind(document.body, { state, train, ui, edit, views, actions });
 
 const pick = (/** @type {Selection} */ s) => ui.sel(s);
 const netView = createNetView(/** @type {SVGSVGElement} */ (/** @type {unknown} */ (document.getElementById('net'))), pick);

@@ -24,6 +24,9 @@ sample at a time by plain gradient descent, w ← w − α·∂L/∂w, on binary
   exact arithmetic: the 3×3 windows times the kernels, the sum, the bias, the ReLU; on the way
   back, every term of every gradient; for a weight, its gradient summed over every position it
   is used at, and the update.
+- **✏️ edit a weight.** Tap any weight or bias, then drag its slider. The current sample's
+  forward pass reruns with the new value, so every map, the output, the loss and the test images
+  respond while you drag. ↩️ puts it back; ⏪ undoes every edit.
 - **🎯 receptive field** marks every input pixel that can reach the selected neuron, coloured by
   the road it takes: through the bottleneck, or through the skip connection.
 - **Why the U.** Each task draws one square. 🔍 big only needs to see the whole square, so it
@@ -44,6 +47,11 @@ data.js      the three tasks
 view.js      the drawings: SVG behind a narrow API (setMaps, setWeights, setHighlight)
 style.css    layout only; the page works with it switched off (view → 🚫 no CSS)
 ```
+
+On a wide screen the page is four panels: controls on the left, the network in the centre, the
+weight editor and the inspector on the right, and the weights, loss and test images along the
+bottom. Drag the bars between them to resize them. On a phone the panels stack. Either way no panel
+takes its size from text that changes while training, so nothing moves under your finger.
 
 No build step. [plainpanel](https://github.com/Zaffer/plainpanel) loads from jsDelivr, pinned in
 the import map. To run it locally, serve the folder, for example `python3 -m http.server`, and
