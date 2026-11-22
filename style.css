@@ -1,0 +1,51 @@
+/* Structure only: three columns on a wide screen, one on a phone, and drawings that fill their
+   fieldset. Every control renders with browser defaults. The page follows the OS theme. */
+
+:root {
+  color-scheme: light dark;
+  --page: light-dark(#ffffff, #000000);
+  --panel: light-dark(#eeeeee, #111111);
+  --gap: 8px;
+}
+
+body { background-color: var(--page); margin: 0; }
+
+#top {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--gap);
+  padding: 4px var(--gap);
+  background: var(--panel);
+}
+[popover] { max-width: 40em; border-radius: 5px; }
+
+main {
+  display: grid;
+  grid-template-columns: 260px minmax(320px, 520px) minmax(340px, 1fr);
+  gap: var(--gap);
+  padding: var(--gap);
+  align-items: start;
+}
+.col { display: flex; flex-direction: column; gap: var(--gap); min-width: 0; }
+
+fieldset { background: var(--panel); border-radius: 5px; margin: 0; min-width: 0; }
+fieldset > div { margin: 2px 0; }
+
+svg { display: block; width: 100%; height: auto; }
+#loss { height: 100px; }
+
+pre { font-size: 11px; line-height: 1.35; overflow-x: auto; margin: 4px 0 0; }
+
+/* phones: one column, the network and the inspector first */
+@media (max-width: 900px) {
+  main { display: flex; flex-direction: column; }
+  .col { display: contents; }
+  #netBox { order: 1; }
+  #inspBox { order: 2; }
+  #trainBox { order: 3; }
+  #weightBox { order: 4; }
+  #lossBox { order: 5; }
+  #testBox { order: 6; }
+  #viewBox { order: 7; }
+  #keyBox { order: 8; }
+  pre { font-size: 10px; }
+}

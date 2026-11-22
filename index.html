@@ -1,12 +1,121 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="color-scheme" content="dark">
-    <link rel="icon" href="data:,">
-    <title>convolutional U-net</title>
-  </head>
-  <body style="margin: 0; overflow: hidden; font-family: monospace;">
-    <script type="module" src="./src/main.ts"></script>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>convolutional U-net</title>
+<meta name="description" content="A tiny U-net learning on 8×8 images, one neuron and one weight at a time.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./style.css">
+<script type="importmap">
+  { "imports": { "plainpanel": "https://cdn.jsdelivr.net/gh/Zaffer/plainpanel@v0.5.5/dist/plainpanel.js" } }
+</script>
+<script type="module" src="./app.js"></script>
+</head>
+<body>
+
+<header id="top">
+  <strong>convolutional U-net</strong>
+  <button popovertarget="about">❔ about</button>
+  <div popover id="about">
+    <p>A U-net turns an image into another image of the same size. This one is as small as a U-net
+      can be: 8×8 pictures, two channels per layer, 135 weights. Small enough to see every number.</p>
+    <p><b>The shape.</b> The encoder (left) looks at the picture through 3×3 windows. Max-pooling
+      halves the resolution, so the bottleneck (bottom) sees the whole picture coarsely. The decoder
+      (right) brings the resolution back up, and the <b>skip connection</b> hands it the encoder’s
+      full-resolution map as well: coarse context from the bottom, fine detail from across.</p>
+    <p><b>Step through it.</b> ➡ step does one stage: the forward pass layer by layer, then the
+      backward pass layer by layer, then the weight update. Tap any neuron or weight to see the exact
+      arithmetic behind it. With 📍 follow on, each step selects a neuron it just computed.</p>
+    <p><b>See why it is shaped like a U.</b> Pick a task, ▶ play until it learns, then switch off one
+      of the two paths into the decoder, press ↺ new weights, and train again. 🔲 outline needs the
+      skip connection; 🔍 big only needs the bottleneck.</p>
+    <p>Source: <a href="https://github.com/Zaffer/convolutional-u-net">github.com/Zaffer/convolutional-u-net</a></p>
+  </div>
+  <span>
+    <button data-on="click:actions.step" data-disabled="views.stepLocked">➡ step</button>
+    <button data-on="click:actions.sample" data-disabled="views.stepLocked">⏭ finish sample</button>
+    <button data-on="click:actions.hundred" data-disabled="views.stepLocked">⏩ 100 samples</button>
+    <button data-on="click:actions.play" data-disabled="views.stepLocked">▶ play</button>
+    <button data-on="click:actions.pause" data-disabled="views.pauseLocked">⏸ pause</button>
+    <button data-on="click:actions.reset">↺ new weights</button>
+  </span>
+  <label>samples <output data-text="views.samples"></output></label>
+</header>
+
+<main>
+  <div class="col" id="colA">
+    <fieldset id="trainBox">
+      <legend>training</legend>
+      <div>task:
+        <label><input type="radio" name="task" value="outline" data-bind="train.task"> 🔲 outline</label>
+        <label><input type="radio" name="task" value="big" data-bind="train.task"> 🔍 big only</label>
+        <label><input type="radio" name="task" value="denoise" data-bind="train.task"> 🧹 denoise</label>
+      </div>
+      <p><small><output data-text="views.taskAbout"></output></small></p>
+      <div>paths into the decoder:
+        <label><input type="checkbox" switch data-bind="train.skip"> ↪ skip connection</label>
+        <label><input type="checkbox" switch data-bind="train.deep"> ⤵ bottleneck</label>
+      </div>
+      <div><label for="alphaIn">learning rate α <output data-text="views.alpha"></output><br>
+        <input id="alphaIn" type="range" min="0.0005" max="0.02" step="0.0005" data-bind="train.alpha"></label></div>
+      <div><label for="speedIn">play speed <output data-text="views.speed"></output><br>
+        <input id="speedIn" type="range" min="-4" max="10" step="1" data-bind="train.speed"></label></div>
+    </fieldset>
+
+    <fieldset id="viewBox">
+      <legend>view</legend>
+      <div>colour by:
+        <label><input type="radio" name="mode" value="value" data-bind="ui.mode"> 🔵 value</label>
+        <label><input type="radio" name="mode" value="grad" data-bind="ui.mode"> ∇ gradient</label>
+      </div>
+      <div><label><input type="checkbox" data-bind="ui.field"> 🎯 receptive field</label></div>
+      <div><label><input type="checkbox" data-bind="ui.follow"> 📍 follow each step</label></div>
+      <div><label><input type="checkbox" data-bind="ui.noCss"> 🚫 no CSS</label></div>
+    </fieldset>
+
+    <fieldset id="keyBox">
+      <legend>key</legend>
+      <div><span style="color:#2a9df4">■</span> positive, <span style="color:#f0605a">■</span> negative; stronger colour, bigger number. Blank: not computed yet.</div>
+      <div>▣ selected · ⬚ dashed: what it reads (forward) or feeds (backward)</div>
+      <div>🎯 receptive field, every input that can reach the selected neuron:
+        <span style="color:#a970ff">□</span> through the bottleneck,
+        <span style="color:#e89a1c">□</span> through the skip connection, both colours: both.</div>
+      <div>Each map is scaled to its own largest value; the inspector has the exact numbers.</div>
+    </fieldset>
+  </div>
+
+  <div class="col" id="colB">
+    <fieldset id="netBox">
+      <legend>network: tap a neuron</legend>
+      <svg id="net" role="img" aria-label="the U-net: every neuron of every map"></svg>
+    </fieldset>
+    <fieldset id="weightBox">
+      <legend>weights: tap one</legend>
+      <svg id="weights" role="img" aria-label="every weight and bias"></svg>
+    </fieldset>
+  </div>
+
+  <div class="col" id="colC">
+    <fieldset id="inspBox">
+      <legend>🔍 inspector</legend>
+      <div>done: <output data-text="views.done"></output></div>
+      <div>next: <output data-text="views.next"></output></div>
+      <pre data-text="views.inspect"></pre>
+    </fieldset>
+    <fieldset id="lossBox">
+      <legend>loss</legend>
+      <div>this sample <output data-text="views.loss"></output> · last 200 <output data-text="views.avgLoss"></output> · chart top <output data-text="views.chartTop"></output></div>
+      <svg id="loss" role="img" aria-label="loss per sample over training"></svg>
+    </fieldset>
+    <fieldset id="testBox">
+      <legend>test images</legend>
+      <div><output data-text="views.test"></output></div>
+      <svg id="tests" role="img" aria-label="four test images: input, output, target"></svg>
+    </fieldset>
+  </div>
+</main>
+
+</body>
 </html>

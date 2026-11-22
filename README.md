@@ -1,91 +1,49 @@
-# Diffusion World Model Visualiser
+# convolutional U-net
 
-## TODO
+The smallest U-net that is still a U-net, learning on 8×8 images, with every neuron and every
+weight on screen.
 
-- [ ] init
-
-
-## Setup
-
-   ```
-   bun install
-   bun start
-   ```
- `http://localhost:3000`
-
-Live at https://zaffer.github.io/convolutional-u-net/, built and deployed by
-[.github/workflows/pages.yml](.github/workflows/pages.yml) on every push.
-
-## Usage
-
-The application initializes a 3D scene for machine learning visualizations using THREE.js and WebGPU.
-
-## Background
-- https://arxiv.org/abs/2405.12399
-- https://diamond-wm.github.io/
-
-
-## Technical Details (for the agents 🤖)
-
-### Architecture Overview
-
-This project implements a 3D machine learning visualization and training system using TypeScript, THREE.js with WebGPU, and reactive programming with RxJS. The architecture follows a modular design with clear separation of concerns.
-
-### Technology Stack
-
-- **TypeScript**: Type-safe development with modern ES features
-- **THREE.js**: 3D graphics with WebGPU renderer for high performance
-- **RxJS**: Reactive programming for state management and data flow
-- **Vite**: Fast development server and build tool
-
-### Data Flow Architecture
+**Live: https://zaffer.github.io/convolutional-u-net/**
 
 ```
-User Interaction
-↓
-ControlManager
-↓
-AppController
-↓
-DataManager/TrainingManager
-↓
-Training Updates
-↓
-AppState
-↓
-VisualizationManager
-↓
-SceneManager
-↓
-THREE.js Scene Updates
-↓
-WebGPU Renderer
-↓
-Browser Display
+x (1×8×8) ─conv 3×3, ReLU─▶ e (2×8×8) ──────────── skip connection (copy) ─────────────┐
+                              │ max-pool 2×2                                           ▼
+                            p (2×4×4) ─conv 3×3, ReLU─▶ b (2×4×4) ─upsample ×2─▶ u (2×8×8)
+                                                                      [u, e] ─conv 3×3, ReLU─▶ d (2×8×8)
+                                                                                d ─conv 1×1, sigmoid─▶ y (1×8×8)
 ```
 
-### Key Design Patterns
+135 weights. Trained one sample at a time by plain gradient descent, w ← w − α·∂L/∂w, on
+binary cross-entropy.
 
-1. **Observer Pattern**: RxJS observables for reactive state management
-2. **Singleton Pattern**: AppState for centralized state
-3. **Manager Pattern**: Separate managers for different concerns
-4. **Factory Pattern**: Visualization creation functions
-5. **Facade Pattern**: ControlManager simplifies UI interactions
+## What to do with it
 
-### Core Principles
+- **➡ step** walks one sample through 14 stages: the forward pass layer by layer, the backward
+  pass layer by layer, then the update. Tap any neuron or weight and the inspector writes out the
+  exact arithmetic: the 3×3 windows times the kernels, the sum, the bias, the ReLU; on the way
+  back, every term of every gradient; for a weight, its gradient summed over every position it
+  is used at, and the update.
+- **🎯 receptive field** marks every input pixel that can reach the selected neuron, coloured by
+  the road it takes: through the bottleneck, or through the skip connection.
+- **Why the U.** Each task draws one square. 🔲 outline needs fine detail, so it needs the skip
+  connection. 🔍 big only needs to see the whole square, so it needs the bottleneck. Switch
+  either path off, press ↺ new weights, ▶ play, and watch which task stalls.
 
-- Keep things simple - complexity is the enemy
-- Less code is better - prefer concise, readable solutions
-- Always use current best practices and latest language features
-- Assume latest versions of dependencies and packages
+## Files
 
-### Implementation Guidelines
+```
+index.html   the panels: native controls in fieldsets, bound to the store with data-* attributes
+app.js       the store (plainpanel signals), the stages and actions, the effects that draw
+net.js       the network as pure functions: conv, pool, upsample, each with its backward pass
+explain.js   the inspector's text and the highlights, as pure functions of the store
+data.js      the three tasks
+view.js      the drawings: SVG behind a narrow API (setMaps, setWeights, setHighlight)
+style.css    layout only; the page works with it switched off (view → 🚫 no CSS)
+```
 
-- Use modern TypeScript features (latest syntax, strict typing)
-- Favor declarative code over imperative when possible
-- Leverage RxJS for reactive, declarative data flow
-- Prefer functional programming patterns where appropriate
-- Use destructuring, arrow functions, and modern ES features
-- Avoid unnecessary abstractions
-- Prefer composition over inheritance
-- Write self-documenting code with clear variable and function names
+No build step. [plainpanel](https://github.com/Zaffer/plainpanel) loads from jsDelivr, pinned in
+the import map. To run it locally, serve the folder, for example `python3 -m http.server`, and
+open http://localhost:8000.
+
+The gradients are checked against finite differences (worst error 2·10⁻⁹), and each task's
+claim about which path it needs was measured: three seeds each, 20,000 samples, 50 test images.
