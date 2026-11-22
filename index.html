@@ -20,19 +20,22 @@
   <button popovertarget="about">❔ about</button>
   <div popover id="about">
     <p>A U-net turns an image into another image of the same size. This one is as small as a U-net
-      can be: 8×8 pictures, two channels per layer, 135 weights. Small enough to see every number.</p>
+      can be: 8×8 pictures, 207 weights. Small enough to see every number.</p>
     <p><b>The shape.</b> The encoder (left) looks at the picture through 3×3 windows. Max-pooling
-      halves the resolution, so the bottleneck (bottom) sees the whole picture coarsely. The decoder
-      (right) brings the resolution back up, and the <b>skip connection</b> hands it the encoder’s
-      full-resolution map as well: coarse context from the bottom, fine detail from across.</p>
+      halves the resolution, so the bottleneck (bottom) sees the whole picture coarsely. As in real
+      U-nets, the channels double where the resolution halves: 2 at full resolution, 4 in the
+      bottleneck. A learned 2×2 up-convolution brings it back up to 2 channels at full resolution,
+      and the <b>skip connection</b> hands the decoder (right) the encoder’s full-resolution map as
+      well: coarse context from the bottom, fine detail from across.</p>
     <p><b>Step through it.</b> ➡ step does one stage: the forward pass layer by layer, then the
       backward pass layer by layer, then the weight update. Tap any neuron or weight to see the exact
       arithmetic behind it. With 📍 follow on, each step selects a neuron it just computed.</p>
     <p><b>See why it is shaped like a U.</b> Pick a task, ▶ play until it learns, then switch off one
       of the two paths into the decoder, press ↺ new weights, and train again. 🔲 outline needs the
       skip connection; 🔍 big only needs the bottleneck.</p>
-    <p><b>If it stalls</b> with both paths on (about one start in five on 🔲 outline), some ReLUs have
-      gone dead: the inspector shows their gradient stopping. Press ↺ new weights for a fresh start.</p>
+    <p><b>If it stalls at 89%</b> on 🔲 outline (about one start in three), the network has learned
+      to copy its input. That is most of the way to an outline, and almost no gradient points away
+      from it. Press ↺ new weights for a fresh start.</p>
     <p>Source: <a href="https://github.com/Zaffer/convolutional-u-net">github.com/Zaffer/convolutional-u-net</a></p>
   </div>
   <span>

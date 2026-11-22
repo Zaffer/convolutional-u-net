@@ -2,11 +2,14 @@
 // A tiny U-net as pure functions. Every intermediate map and every gradient is kept, so the page
 // can show how each neuron got its value and how each weight is about to move.
 //
-//   x (1×8×8) ─enc conv 3×3, ReLU─▶ e (C×8×8) ─────────────── skip (copy) ──────────────┐
-//                                     │ max-pool 2×2                                     ▼
-//                                   p (C×4×4) ─mid conv 3×3, ReLU─▶ b (C×4×4) ─upsample─▶ u (C×8×8)
-//                                                                            [u, e] ─dec conv 3×3, ReLU─▶ d (C×8×8)
-//                                                                                     d ─out conv 1×1, sigmoid─▶ y (1×8×8)
+//   x (1×8×8) ─enc conv 3×3, ReLU─▶ e (2×8×8) ──────────────── skip (copy) ─────────────────┐
+//                                     │ max-pool 2×2                                          ▼
+//                                   p (2×4×4) ─mid conv 3×3, ReLU─▶ b (4×4×4) ─up-conv 2×2─▶ u (2×8×8)
+//                                                                              [u, e] ─dec conv 3×3, ReLU─▶ d (2×8×8)
+//                                                                                       d ─out conv 1×1, sigmoid─▶ y (1×8×8)
+//
+// As in real U-nets, the channels double where the resolution halves (the bottleneck has 4), and a
+// learned up-convolution halves them again on the way back up.
 //
 // A map is a Float64Array of n×n values, row-major. A tensor is an array of maps (channels).
 // A kernel is a Float64Array of ks×ks weights, indexed (dr + h) * ks + (dc + h) for offsets -h..h:
@@ -14,25 +17,31 @@
 
 export const N = 8; // full resolution
 export const M = N / 2; // after pooling
-export const C = 2; // channels in every hidden layer
+export const C = 2; // channels at full resolution
+export const CB = 2 * C; // channels in the bottleneck
+/** channels in each map */
+export const CH = /** @type {const} */ ({ x: 1, t: 1, e: C, p: C, b: CB, u: C, d: C, y: 1 });
 
 /** @typedef {Float64Array} Map */
 /** @typedef {{ w: Float64Array[][], b: number[] }} Layer  w[out][in] is one kernel */
-/** @typedef {{ enc: Layer, mid: Layer, dec: Layer, out: Layer }} Params */
-/** @typedef {'enc' | 'mid' | 'dec' | 'out'} LayerId */
+/** @typedef {{ enc: Layer, mid: Layer, up: Layer, dec: Layer, out: Layer }} Params */
+/** @typedef {'enc' | 'mid' | 'up' | 'dec' | 'out'} LayerId */
 
 /**
- * The four layers with weights. `from` names the maps each one reads, in channel order; `to` the
- * map it writes. The decoder reads the upsampled map u and, through the skip connection, e.
+ * The five layers with weights. `from` names the maps each one reads, in channel order; `to` the
+ * map it writes; `n` the size of the map it writes. The decoder reads the up-convolved map u and,
+ * through the skip connection, e. The up-conv is a transposed convolution: each bottleneck neuron
+ * writes its value, times a 2×2 kernel, into a 2×2 block of u.
  */
 export const LAYERS = /** @type {const} */ ({
   enc: { name: 'encoder conv', from: ['x'], to: 'e', ks: 3, n: N, act: 'ReLU', ins: 1, outs: C },
-  mid: { name: 'bottleneck conv', from: ['p'], to: 'b', ks: 3, n: M, act: 'ReLU', ins: C, outs: C },
+  mid: { name: 'bottleneck conv', from: ['p'], to: 'b', ks: 3, n: M, act: 'ReLU', ins: C, outs: CB },
+  up: { name: 'up-conv', from: ['b'], to: 'u', ks: 2, n: N, act: 'none', ins: CB, outs: C },
   dec: { name: 'decoder conv', from: ['u', 'e'], to: 'd', ks: 3, n: N, act: 'ReLU', ins: 2 * C, outs: C },
   out: { name: 'output conv', from: ['d'], to: 'y', ks: 1, n: N, act: 'sigmoid', ins: C, outs: 1 },
 });
 /** @type {LayerId[]} */
-export const LAYER_IDS = ['enc', 'mid', 'dec', 'out'];
+export const LAYER_IDS = ['enc', 'mid', 'up', 'dec', 'out'];
 
 // ── a seeded random source, so a test set is the same every time ──
 
@@ -48,22 +57,23 @@ export function rng(seed) {
   };
 }
 
-/** He initialisation: weights ~ N(0, 2 / fan-in), small positive biases so no ReLU starts dead. */
+/** He initialisation: weights ~ N(0, 2 / fan-in), small positive biases so no ReLU starts dead.
+ *  (An up-conv output neuron hears from one weight per input channel, so its fan-in is just ins.) */
 export function init(seed = (Math.random() * 2 ** 32) >>> 0) {
   const r = rng(seed);
   const gauss = () => Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r());
   /** @returns {Layer} */
   const layer = (/** @type {LayerId} */ id) => {
     const L = LAYERS[id];
-    const sd = Math.sqrt(2 / (L.ins * L.ks * L.ks));
+    const sd = Math.sqrt(2 / (id === 'up' ? L.ins : L.ins * L.ks * L.ks));
     return {
       w: Array.from({ length: L.outs }, () =>
         Array.from({ length: L.ins }, () => Float64Array.from({ length: L.ks * L.ks }, () => gauss() * sd)),
       ),
-      b: Array.from({ length: L.outs }, () => (id === 'out' ? 0 : 0.1)),
+      b: Array.from({ length: L.outs }, () => (id === 'out' || id === 'up' ? 0 : 0.1)),
     };
   };
-  return /** @type {Params} */ ({ enc: layer('enc'), mid: layer('mid'), dec: layer('dec'), out: layer('out') });
+  return /** @type {Params} */ (Object.fromEntries(LAYER_IDS.map(id => [id, layer(id)])));
 }
 
 // ── the operations, each with its backward pass ──
@@ -173,17 +183,46 @@ export const poolBack = (dOut, arg, n) =>
     return back;
   });
 
-/** Nearest-neighbour upsample: each neuron is copied into a 2×2 block. @param {Map[]} t @param {number} m  input size */
-export const upsample = (t, m) =>
-  t.map(src => Float64Array.from({ length: 4 * m * m }, (_, j) => src[(Math.floor(j / (2 * m)) >> 1) * m + ((j % (2 * m)) >> 1)]));
-/** Each source neuron collects the gradient of its four copies. @param {Map[]} dOut @param {number} m */
-export const upsampleBack = (dOut, m) =>
-  dOut.map(g => Float64Array.from({ length: m * m }, (_, j) => {
-    const r = Math.floor(j / m) * 2;
-    const c = (j % m) * 2;
-    const n = 2 * m;
-    return g[r * n + c] + g[r * n + c + 1] + g[(r + 1) * n + c] + g[(r + 1) * n + c + 1];
-  }));
+/**
+ * 2×2 up-convolution (a transposed convolution, stride 2): bottleneck neuron i at (R, Q) adds
+ * value × w[o][i][a·2 + c] to u_o at (2R + a, 2Q + c). Each u neuron hears from exactly one
+ * position of every bottleneck map, through one weight of each kernel.
+ * @param {Map[]} input  CB maps of m×m @param {number} m @param {Layer} L
+ */
+export function upconv(input, m, L) {
+  const n = 2 * m;
+  return L.w.map((row, o) => {
+    const out = new Float64Array(n * n).fill(L.b[o]);
+    row.forEach((k, i) => {
+      for (let R = 0; R < m; R++)
+        for (let Q = 0; Q < m; Q++) {
+          const v = input[i][R * m + Q];
+          for (let a = 0; a < 2; a++) for (let c = 0; c < 2; c++) out[(2 * R + a) * n + 2 * Q + c] += v * k[a * 2 + c];
+        }
+    });
+    return out;
+  });
+}
+/** @param {Map[]} input @param {number} m @param {Layer} L @param {Map[]} dOut  ∂L/∂u @returns {{ grad: Layer, dIn: Map[] }} */
+export function upconvBack(input, m, L, dOut) {
+  const n = 2 * m;
+  const dIn = input.map(() => new Float64Array(m * m));
+  const w = L.w.map((row, o) =>
+    row.map((k, i) => {
+      const g = new Float64Array(4);
+      for (let R = 0; R < m; R++)
+        for (let Q = 0; Q < m; Q++)
+          for (let a = 0; a < 2; a++)
+            for (let c = 0; c < 2; c++) {
+              const d = dOut[o][(2 * R + a) * n + 2 * Q + c];
+              g[a * 2 + c] += d * input[i][R * m + Q];
+              dIn[i][R * m + Q] += d * k[a * 2 + c];
+            }
+      return g;
+    }),
+  );
+  return { grad: { w, b: dOut.map(g => g.reduce((s, v) => s + v, 0)) }, dIn };
+}
 
 // ── the whole network ──
 
@@ -211,7 +250,7 @@ export function forward(P, x, t, { skip = true, deep = true } = {}) {
   const bPre = conv(p, M, P.mid, 3);
   const b = relu(bPre);
   const zeros = (/** @type {Map[]} */ t) => t.map(m => new Float64Array(m.length));
-  const u = deep ? upsample(b, M) : zeros(e);
+  const u = deep ? upconv(b, M, P.up) : zeros(e);
   const sk = skip ? e : zeros(e);
   const dPre = conv([...u, ...sk], N, P.dec, 3);
   const d = relu(dPre);
@@ -244,7 +283,8 @@ export function backward(P, T) {
   // a cut path carries no gradient back
   const u = dc.dIn.slice(0, C).map(m => (T.cut.deep ? m.map(() => 0) : m));
   const skip = dc.dIn.slice(C).map(m => (T.cut.skip ? m.map(() => 0) : m));
-  const b = upsampleBack(u, M);
+  const up = upconvBack(T.b, M, P.up, u);
+  const b = up.dIn;
   const bPre = reluBack(b, T.bPre);
   const m = convBack(T.p, M, P.mid, 3, bPre);
   const p = m.dIn;
@@ -253,7 +293,7 @@ export function backward(P, T) {
   const e = eFromPool.map((g, c) => g.map((v, j) => v + skip[c][j]));
   const ePre = reluBack(e, T.ePre);
   const en = convBack(T.x, N, P.enc, 3, ePre);
-  return { y, d, dPre, u, skip, b, bPre, p, eFromPool, e, ePre, w: { enc: en.grad, mid: m.grad, dec: dc.grad, out: o.grad } };
+  return { y, d, dPre, u, skip, b, bPre, p, eFromPool, e, ePre, w: { enc: en.grad, mid: m.grad, up: up.grad, dec: dc.grad, out: o.grad } };
 }
 
 /** One gradient-descent step: every weight w ← w − α·∂L/∂w. Returns new params. @param {Params} P @param {Params} G @param {number} alpha */
@@ -263,7 +303,7 @@ export function apply(P, G, alpha) {
     w: P[id].w.map((row, o) => row.map((k, i) => k.map((v, j) => v - alpha * G[id].w[o][i][j]))),
     b: P[id].b.map((v, o) => v - alpha * G[id].b[o]),
   });
-  return { enc: step('enc'), mid: step('mid'), dec: step('dec'), out: step('out') };
+  return /** @type {Params} */ (Object.fromEntries(LAYER_IDS.map(id => [id, step(id)])));
 }
 
 /** Fraction of pixels the network gets right (output rounded to 0 or 1). @param {Trace} T */

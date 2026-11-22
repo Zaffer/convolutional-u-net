@@ -2,7 +2,7 @@
 // The drawings: plain imperative SVG behind a narrow API, no signals in here. The store pushes
 // values and highlights in; taps come out through one callback. Every SVG has a viewBox and a
 // natural width, so CSS (or, with no CSS, nothing at all) decides its size.
-import { N, M, C, LAYERS, LAYER_IDS } from './net.js';
+import { N, M, C, CH, LAYERS, LAYER_IDS } from './net.js';
 
 /** @typedef {import('./net.js').LayerId} LayerId */
 /** @typedef {'x' | 't' | 'e' | 'p' | 'b' | 'u' | 'd' | 'y'} MapName */
@@ -50,7 +50,7 @@ function grid(/** @type {Element} */ parent, /** @type {number} */ x, /** @type 
   const cells = [];
   for (let r = 0; r < n; r++)
     for (let c = 0; c < n; c++) {
-      const rect = /** @type {SVGRectElement} */ (svg('rect', { x: x + c * s, y: y + r * s, width: s, height: s, fill: 'none', stroke: GRID, 'stroke-width': 0.5 }, g));
+      const rect = /** @type {SVGRectElement} */ (svg('rect', { x: x + c * s, y: y + r * s, width: s, height: s, fill: 'none', stroke: GRID, 'stroke-width': 0.5, 'pointer-events': 'all' }, g)); // tappable even when blank
       for (const [k, v] of Object.entries(data)) rect.dataset[k] = v;
       rect.dataset.r = String(r);
       rect.dataset.c = String(c);
@@ -92,14 +92,14 @@ const AT = /** @type {Record<string, { x: number, y: number, n: number }>} */ ({
   x0: { x: 43, y: 16, n: N },
   e0: { x: 0, y: 128, n: N }, e1: { x: 86, y: 128, n: N },
   p0: { x: 80, y: 240, n: M }, p1: { x: 126, y: 240, n: M },
-  b0: { x: 137, y: 340, n: M }, b1: { x: 183, y: 340, n: M },
+  b0: { x: 86, y: 340, n: M }, b1: { x: 132, y: 340, n: M }, b2: { x: 178, y: 340, n: M }, b3: { x: 224, y: 340, n: M },
   u0: { x: 200, y: 240, n: N }, u1: { x: 286, y: 240, n: N },
   d0: { x: 200, y: 128, n: N }, d1: { x: 286, y: 128, n: N },
   y0: { x: 200, y: 16, n: N },
   t0: { x: 286, y: 16, n: N },
 });
 const NAMES = /** @type {Record<MapName, string>} */ ({
-  x: 'input', t: 'target', e: 'encoder', p: 'pooled', b: 'bottleneck', u: 'upsampled', d: 'decoder', y: 'output',
+  x: 'input', t: 'target', e: 'encoder', p: 'pooled', b: 'bottleneck', u: 'up-conv', d: 'decoder', y: 'output',
 });
 /** @param {MapName} m @param {number} ch */
 export const mapName = (m, ch) => (m === 'x' || m === 't' || m === 'y' ? m : m + SUB[ch]);
@@ -126,10 +126,12 @@ export function createNetView(root, onPick) {
   label(ops, 128, 110, 'conv 3×3 · ReLU');
   arrow([83, 209, 110, 229]);
   label(ops, 4, 222, 'max-pool 2×2');
-  arrow([123, 281, 165, 329]);
-  label(ops, 60, 316, 'conv 3×3 · ReLU');
-  arrow([224, 352, 283, 330]);
-  label(ops, 232, 368, 'upsample ×2');
+  arrow([123, 281, 145, 329]);
+  label(ops, 30, 308, 'conv 3×3 · ReLU');
+  label(ops, 30, 317, '2 channels → 4', { 'font-size': 7 });
+  arrow([268, 338, 290, 326]);
+  label(ops, 300, 345, 'up-conv 2×2');
+  label(ops, 300, 354, '4 channels → 2', { 'font-size': 7 });
   arrow([283, 239, 283, 219]);
   label(ops, 290, 224, 'conv 3×3 · reads u and e', { 'font-size': 7 });
   arrow([240, 127, 240, 106]);
@@ -179,12 +181,13 @@ export function createNetView(root, onPick) {
 // ── the weights: one 3×3 grid per kernel, rows are output maps, columns input maps ──
 
 const K = 9; // one weight
-const PITCH = 32;
+const names = (/** @type {MapName} */ m) => Array.from({ length: CH[m] }, (_, ch) => mapName(m, ch));
 const BLOCKS = /** @type {Record<LayerId, { x: number, y: number, cols: string[], rows: string[] }>} */ ({
-  enc: { x: 0, y: 0, cols: ['x'], rows: ['e₀', 'e₁'] },
-  mid: { x: 190, y: 0, cols: ['p₀', 'p₁'], rows: ['b₀', 'b₁'] },
-  dec: { x: 0, y: 100, cols: ['u₀', 'u₁', 'e₀', 'e₁'], rows: ['d₀', 'd₁'] },
-  out: { x: 190, y: 100, cols: ['d₀', 'd₁'], rows: ['y'] },
+  enc: { x: 0, y: 0, cols: names('x'), rows: names('e') },
+  dec: { x: 0, y: 96, cols: [...names('u'), ...names('e')], rows: names('d') },
+  out: { x: 0, y: 192, cols: names('d'), rows: names('y') },
+  mid: { x: 190, y: 0, cols: names('p'), rows: names('b') },
+  up: { x: 190, y: 162, cols: names('b'), rows: names('u') },
 });
 
 /**
@@ -192,8 +195,8 @@ const BLOCKS = /** @type {Record<LayerId, { x: number, y: number, cols: string[]
  * @param {(s: Selection) => void} onPick
  */
 export function createWeightView(root, onPick) {
-  root.setAttribute('viewBox', '0 -2 300 192');
-  root.setAttribute('width', '300');
+  root.setAttribute('viewBox', '0 -2 316 236');
+  root.setAttribute('width', '316');
   /** @type {Record<string, SVGRectElement[]>} key 'dec 0 3' (layer, out, in) or 'dec 0 b' */
   const cells = {};
   /** @type {Record<string, { x: number, y: number, s: number }>} */
@@ -201,13 +204,13 @@ export function createWeightView(root, onPick) {
   for (const id of LAYER_IDS) {
     const L = LAYERS[id];
     const B = BLOCKS[id];
-    const pitch = L.ks === 1 ? 16 : PITCH;
+    const pitch = L.ks * K + 5; // one kernel and a gap, across and down
     label(root, B.x, B.y + 8, `${id}: ${L.name}`, { 'font-weight': 'bold' });
     B.cols.forEach((name, i) => label(root, B.x + 18 + i * pitch, B.y + 20, name, { 'font-size': 7 }));
     const bx = B.x + 18 + L.ins * pitch + 4;
     label(root, bx, B.y + 20, 'bias', { 'font-size': 7 });
     B.rows.forEach((name, o) => {
-      const y = B.y + 24 + o * PITCH;
+      const y = B.y + 24 + o * pitch;
       label(root, B.x, y + 9, name, { 'font-size': 7 });
       for (let i = 0; i < L.ins; i++) {
         const key = `${id} ${o} ${i}`;
@@ -241,7 +244,9 @@ export function createWeightView(root, onPick) {
       }
       for (const { key, j, mark } of h.cells) {
         const b = boxes[key];
-        if (b) outline(marks, { x: b.x + (j % 3) * K, y: b.y + Math.floor(j / 3) * K, s: K }, mark);
+        if (!b) continue; // a network cell, not a weight
+        const ks = LAYERS[/** @type {LayerId} */ (key.split(' ')[0])].ks;
+        outline(marks, { x: b.x + (j % ks) * K, y: b.y + Math.floor(j / ks) * K, s: K }, mark);
       }
     },
   };

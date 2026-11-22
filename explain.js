@@ -1,7 +1,7 @@
 // @ts-check
 // What the inspector says: for any neuron or weight, the exact arithmetic that produced its value,
 // its gradient, or its update, written out as plain text. Pure functions of the store's data.
-import { N, M, C, LAYERS } from './net.js';
+import { N, M, C, CH, LAYERS } from './net.js';
 import { mapName, SUB } from './view.js';
 
 /** @typedef {import('./net.js').Params} Params */
@@ -23,13 +23,13 @@ export const STAGES = /** @type {const} */ ([
   { label: '① encoder conv 3×3 + ReLU → e', dir: 'fwd', shows: 'e' },
   { label: '② max-pool 2×2 → p', dir: 'fwd', shows: 'p' },
   { label: '③ bottleneck conv 3×3 + ReLU → b', dir: 'fwd', shows: 'b' },
-  { label: '④ upsample ×2 → u', dir: 'fwd', shows: 'u' },
+  { label: '④ up-conv 2×2: 4 channels back to 2, at double resolution → u', dir: 'fwd', shows: 'u' },
   { label: '⑤ decoder conv 3×3 + ReLU, reading u and the skip copy of e → d', dir: 'fwd', shows: 'd' },
   { label: '⑥ output conv 1×1 + sigmoid → y, and the loss', dir: 'fwd', shows: 'y' },
   { label: '⑦ output error y − t, and the output weights’ gradients', dir: 'back', shows: 'y', weights: 'out' },
   { label: '⑧ back through the output conv → ∂L/∂d, and the decoder weights’ gradients', dir: 'back', shows: 'd', weights: 'dec' },
-  { label: '⑨ back through the decoder conv → ∂L/∂u, and along the skip connection', dir: 'back', shows: 'u' },
-  { label: '⑩ back through the upsample → ∂L/∂b, and the bottleneck weights’ gradients', dir: 'back', shows: 'b', weights: 'mid' },
+  { label: '⑨ back through the decoder conv → ∂L/∂u, along the skip connection, and the up-conv weights’ gradients', dir: 'back', shows: 'u', weights: 'up' },
+  { label: '⑩ back through the up-conv → ∂L/∂b, and the bottleneck weights’ gradients', dir: 'back', shows: 'b', weights: 'mid' },
   { label: '⑪ back through the bottleneck conv → ∂L/∂p', dir: 'back', shows: 'p' },
   { label: '⑫ back through the pool, plus the skip → ∂L/∂e, and the encoder weights’ gradients', dir: 'back', shows: 'e', weights: 'enc' },
   { label: '⑬ update every weight: w ← w − α·∂L/∂w', dir: 'update' },
@@ -40,7 +40,7 @@ export const LAST = STAGES.length - 1;
 export const FWD = /** @type {Record<MapName, number>} */ ({ x: 0, t: 0, e: 1, p: 2, b: 3, u: 4, d: 5, y: 6 });
 export const BACK = /** @type {Record<MapName, number>} */ ({ x: Infinity, t: Infinity, y: 7, d: 8, u: 9, b: 10, p: 11, e: 12 });
 /** the stage that computes each layer's weight gradients */
-export const WGRAD = /** @type {Record<LayerId, number>} */ ({ out: 7, dec: 8, mid: 10, enc: 12 });
+export const WGRAD = /** @type {Record<LayerId, number>} */ ({ out: 7, dec: 8, up: 9, mid: 10, enc: 12 });
 
 /**
  * @typedef {object} Ctx
@@ -54,17 +54,20 @@ export const WGRAD = /** @type {Record<LayerId, number>} */ ({ out: 7, dec: 8, m
 
 const size = (/** @type {MapName} */ m) => (m === 'p' || m === 'b' ? M : N);
 const v3 = (/** @type {number} */ v) => (v < 0 ? '−' : '+') + Math.abs(v).toFixed(3);
+const f4 = (/** @type {number} */ v) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(4);
 const u3 = (/** @type {number} */ v) => (v < 0 ? '−' : ' ') + Math.abs(v).toFixed(3);
 const at = (/** @type {number} */ r, /** @type {number} */ c) => `(${r},${c})`;
 const plural = (/** @type {number} */ n, /** @type {string} */ w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
 /** the maps a layer reads, in its input-channel order: [map, channel] */
-const inputsOf = (/** @type {LayerId} */ id) => LAYERS[id].from.flatMap(m => Array.from({ length: m === 'x' ? 1 : C }, (_, ch) => /** @type {[MapName, number]} */ ([m, ch])));
+const inputsOf = (/** @type {LayerId} */ id) => LAYERS[id].from.flatMap(m => Array.from({ length: CH[m] }, (_, ch) => /** @type {[MapName, number]} */ ([m, ch])));
 const layerWriting = (/** @type {MapName} */ m) => /** @type {LayerId | undefined} */ (Object.entries(LAYERS).find(([, L]) => L.to === m)?.[0]);
 /** what the dec layer's input channel i actually received (the cut paths give zeros) */
-const received = (/** @type {Trace} */ T, /** @type {LayerId} */ id) => (id === 'dec' ? [...T.u, ...T.skip] : id === 'enc' ? T.x : id === 'mid' ? T.p : T.d);
-/** ∂L/∂(pre-activation) of a layer's outputs */
-const dPreOf = (/** @type {Grads} */ G, /** @type {LayerId} */ id) => (id === 'out' ? G.y : id === 'dec' ? G.dPre : id === 'mid' ? G.bPre : G.ePre);
+const received = (/** @type {Trace} */ T, /** @type {LayerId} */ id) => (id === 'dec' ? [...T.u, ...T.skip] : id === 'enc' ? T.x : id === 'mid' ? T.p : id === 'up' ? T.b : T.d);
+/** ∂L/∂(pre-activation) of a layer's outputs (the up-conv has no activation: its δ is ∂L/∂u itself) */
+const dPreOf = (/** @type {Grads} */ G, /** @type {LayerId} */ id) =>
+  id === 'out' ? G.y : id === 'dec' ? G.dPre : id === 'up' ? G.u : id === 'mid' ? G.bPre : G.ePre;
+const corner = (/** @type {number} */ a, /** @type {number} */ c) => `${a ? 'bottom' : 'top'}-${c ? 'right' : 'left'}`;
 const wName = (/** @type {LayerId} */ id, /** @type {number} */ o, /** @type {number} */ i) => {
   const [m, ch] = inputsOf(id)[i];
   return `w[${mapName(LAYERS[id].to, o)}←${mapName(m, ch)}]`;
@@ -92,7 +95,7 @@ export function explain(sel, ctx) {
 
 const NAMES = /** @type {Record<MapName, string>} */ ({
   x: 'input pixel', t: 'target pixel', e: 'encoder conv 3×3, ReLU', p: 'max-pool 2×2', b: 'bottleneck conv 3×3, ReLU',
-  u: 'upsample ×2', d: 'decoder conv 3×3, ReLU', y: 'output conv 1×1, sigmoid',
+  u: 'up-conv 2×2', d: 'decoder conv 3×3, ReLU', y: 'output conv 1×1, sigmoid',
 });
 
 /** How the forward pass computed this neuron. */
@@ -127,14 +130,36 @@ function valueText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type
   if (m === 'u') {
     const R = r >> 1;
     const Q = c >> 1;
-    return [
-      `a copy of b${SUB[ch]} at row ${R}, column ${Q} = ${T.b[ch][R * M + Q].toFixed(3)}`,
-      T.cut.deep ? '\n✂ the bottleneck path is cut: the decoder gets 0 instead.' : '',
+    const a = r & 1;
+    const cc = c & 1;
+    if (T.cut.deep) return '✂ the bottleneck path is cut: the decoder gets 0 here\ninstead of the up-conv’s output.';
+    const lines = [
+      `The up-conv works backwards from a conv: each bottleneck`,
+      `position (${R},${Q}) writes into a 2×2 block of u, rows ${2 * R}–${2 * R + 1},`,
+      `columns ${2 * Q}–${2 * Q + 1}. This neuron is the block’s ${corner(a, cc)},`,
+      `so it gets one weight from each of the ${CH.b} bottleneck maps:`,
       '',
-      'Each bottleneck neuron is copied into a 2×2 block, so',
-      `u${SUB[ch]} rows ${2 * R}–${2 * R + 1}, columns ${2 * Q}–${2 * Q + 1} all hold this value.`,
-      'No weights here: coarse context, spread back out.',
-    ].join('\n');
+    ];
+    let sum = 0;
+    for (let i = 0; i < CH.b; i++) {
+      const v = T.b[i][R * M + Q];
+      const w = ctx.P.up.w[ch][i][a * 2 + cc];
+      sum += v * w;
+      lines.push(`  b${SUB[i]}${at(R, Q)} ${u3(v)} × ${wName('up', ch, i)} ${v3(w)} = ${v3(v * w)}`);
+    }
+    const b = ctx.P.up.b[ch];
+    lines.push(
+      '',
+      `${`sum of the ${CH.b}`.padEnd(19)}${v3(sum)}`,
+      `${`+ bias b[u${SUB[ch]}]`.padEnd(19)}${v3(b)}`,
+      `${'= u'.padEnd(19)}${v3(sum + b)}   (no activation)`,
+      '',
+      `${CH.b} coarse channels in, ${C} fine ones out: the learned`,
+      'weights decide what each corner of the block gets, so',
+      'the bottleneck can say more than “something here”.',
+    );
+    if (ctx.stage === LAST) lines.push('', '(the weights have just been updated; these are the new ones.\nThe values on screen came from the old ones.)');
+    return lines.join('\n');
   }
   return convText(/** @type {LayerId} */ (layerWriting(m)), ch, r, c, ctx);
 }
@@ -285,15 +310,25 @@ function gradText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type 
       'each term: δ of that d neuron × the weight it reads u with',
       ...termLines(terms),
       `∂L/∂u${SUB[ch]} = ${v3(G.u[ch][j])}`,
+      '(the up-conv has no activation, so this is also its δ:',
+      'the up-conv weights’ gradients are built from it)',
     ].join('\n');
   }
   if (m === 'b') {
-    const n8 = N;
-    const cells = [[2 * r, 2 * c], [2 * r, 2 * c + 1], [2 * r + 1, 2 * c], [2 * r + 1, 2 * c + 1]];
+    const terms = [];
+    for (let o = 0; o < C; o++)
+      for (let a = 0; a < 2; a++)
+        for (let cc = 0; cc < 2; cc++) {
+          const d = G.u[o][(2 * r + a) * N + 2 * c + cc];
+          const w = ctx.P.up.w[o][ch][a * 2 + cc];
+          terms.push({ who: `u${SUB[o]}${at(2 * r + a, 2 * c + cc)}`, d, w, v: d * w });
+        }
     return [
       intro,
-      `b${SUB[ch]} was copied into 4 neurons of u${SUB[ch]}; its gradient is the sum of theirs:`,
-      ...cells.map(([rr, cc]) => `  u${SUB[ch]}${at(rr, cc)}  ${v3(G.u[ch][rr * n8 + cc])}`),
+      `b${SUB[ch]} wrote into a 2×2 block of each u map, through`,
+      `one up-conv weight per neuron: ${terms.length} terms.`,
+      'each term: ∂L/∂ of that u neuron × the weight between them',
+      ...termLines(terms),
       `∂L/∂b${SUB[ch]} = ${v3(G.b[ch][j])}`,
       '',
       reluGate(G.bPre[ch][j], T.bPre[ch][j], `b${SUB[ch]}`),
@@ -346,13 +381,16 @@ function explainWeight(/** @type {Exclude<Selection, { kind: 'neuron' }>} */ sel
   const k = isBias ? 0 : sel.k;
   const dr = Math.floor(k / L.ks) - h;
   const dc = (k % L.ks) - h;
-  const name = isBias ? `b[${out}]` : `${wName(id, o, i)}, kernel row ${dr + h}, column ${dc + h}`;
+  const isUp = id === 'up';
+  const name = isBias ? `b[${out}]` : `${wName(id, o, i)}, kernel row ${Math.floor(k / L.ks)}, column ${k % L.ks}`;
   const now = isBias ? ctx.P[id].b[o] : ctx.P[id].w[o][i][k];
   const [im, ich] = inputsOf(id)[i];
   const lines = [`${name}  (${id}: ${L.name})`, ''];
   const where = isBias
-    ? `added to every one of the ${n * n} ${out} neurons before the ${L.act}.`
-    : L.ks === 1
+    ? `added to every one of the ${n * n} ${out} neurons${L.act === 'none' ? '' : ` before the ${L.act}`}.`
+    : isUp
+      ? `carries b${SUB[i]} into the ${corner(Math.floor(k / 2), k % 2)} neuron of each 2×2 block\nof ${out}: one weight, shared by all ${M * M} blocks.`
+      : L.ks === 1
       ? `multiplies ${mapName(im, ich)} at each pixel, into ${out} at that pixel.`
       : `used by every one of the ${n * n} ${out} neurons: each multiplies\nthe ${mapName(im, ich)} neuron ${offset(dr, dc)} of itself by it.\nOne weight, shared across the whole image.`;
   lines.push(where, '');
@@ -372,6 +410,13 @@ function explainWeight(/** @type {Exclude<Selection, { kind: 'neuron' }>} */ sel
         terms.push({ who: `${out}${at(r, c)}`, d, w: 1, v: d });
         continue;
       }
+      if (isUp) {
+        // only the block corner this weight writes to; the input is the block's bottleneck neuron
+        if (r % 2 !== Math.floor(k / 2) || c % 2 !== k % 2) continue;
+        const x = src[(r >> 1) * M + (c >> 1)];
+        terms.push({ who: `${out}${at(r, c)}`, d, w: x, v: d * x });
+        continue;
+      }
       const rr = r + dr;
       const cc = c + dc;
       if (rr < 0 || rr >= n || cc < 0 || cc >= n) continue;
@@ -379,13 +424,17 @@ function explainWeight(/** @type {Exclude<Selection, { kind: 'neuron' }>} */ sel
     }
   const g = isBias ? G.w[id].b[o] : G.w[id].w[o][i][k];
   lines.push(
-    isBias ? `∂L/∂b = Σ over every ${out} neuron of its δ (∂L/∂pre):` : `∂L/∂w = Σ over every position of\n  δ of the ${out} neuron there × the ${mapName(im, ich)} value it read:`,
+    isBias
+      ? `∂L/∂b = Σ over every ${out} neuron of its δ (∂L/∂pre):`
+      : isUp
+        ? `∂L/∂w = Σ over the ${M * M} blocks of\n  ∂L/∂ of the ${out} neuron it wrote × the ${mapName(im, ich)} value it carried:`
+        : `∂L/∂w = Σ over every position of\n  δ of the ${out} neuron there × the ${mapName(im, ich)} value it read:`,
     isBias ? '' : `  ${'neuron'.padEnd(8)} ${'δ'.padStart(6)}   ${'input'.padStart(6)}`,
     ...termLines(terms, 6).map(l => l.replace('those neurons’ ReLU was off', 'ReLU off or input 0')),
     `total ${isBias ? '∂L/∂b' : '∂L/∂w'} = ${v3(g)}`,
     '',
-    `update: w − α·∂L/∂w = ${was.toFixed(4)} − ${alpha} × ${g < 0 ? `(${v3(g)})` : g.toFixed(3)} = ${(was - alpha * g).toFixed(4)}`,
-    updated ? `✓ applied: it was ${was.toFixed(4)}, it is now ${now.toFixed(4)}` : 'applied at stage ⑬',
+    `update: w − α·∂L/∂w = ${f4(was)} − ${alpha} × ${g < 0 ? `(${v3(g)})` : g.toFixed(3)} = ${f4(was - alpha * g)}`,
+    updated ? `✓ applied: it was ${f4(was)}, it is now ${f4(now)}` : 'applied at stage ⑬',
   );
   return lines.join('\n');
 }
@@ -434,7 +483,14 @@ export function highlight(sel, ctx, field) {
   };
   if (ctx.mode === 'value') {
     const id = layerWriting(m);
-    if (id) {
+    if (m === 'u') {
+      for (let i = 0; i < CH.b; i++) {
+        h.cells.push({ key: `b${i}`, j: (r >> 1) * M + (c >> 1), mark: 'in' });
+        h.kernels.push({ key: `up ${ch} ${i}`, mark: 'in' });
+        h.cells.push({ key: `up ${ch} ${i}`, j: (r & 1) * 2 + (c & 1), mark: 'sel' });
+      }
+      h.kernels.push({ key: `up ${ch} b`, mark: 'in' });
+    } else if (id) {
       const L = LAYERS[id];
       inputsOf(id).forEach(([im, ich], i) => {
         window(im, ich, r, c, L.n, L.ks >> 1, 'in');
@@ -446,7 +502,7 @@ export function highlight(sel, ctx, field) {
         const j = (2 * r + rr) * N + 2 * c + q;
         h.cells.push({ key: `e${ch}`, j, mark: ctx.T && ctx.T.pArg[ch][r * M + c] === j ? 'max' : 'in' });
       }
-    } else if (m === 'u') h.cells.push({ key: `b${ch}`, j: (r >> 1) * M + (c >> 1), mark: 'in' });
+    }
   } else {
     // backward: the neurons this one feeds, whose gradients flow back into it
     if (m === 'y') h.cells.push({ key: 't0', j: r * N + c, mark: 'in' });
@@ -459,10 +515,14 @@ export function highlight(sel, ctx, field) {
       for (let o = 0; o < C; o++) h.kernels.push({ key: `dec ${o} ${m === 'u' ? ch : C + ch}`, mark: 'in' });
     }
     if (m === 'e') h.cells.push({ key: `p${ch}`, j: (r >> 1) * M + (c >> 1), mark: 'in' });
-    if (m === 'b') for (const [rr, q] of [[0, 0], [0, 1], [1, 0], [1, 1]]) h.cells.push({ key: `u${ch}`, j: (2 * r + rr) * N + 2 * c + q, mark: 'in' });
+    if (m === 'b')
+      for (let o = 0; o < C; o++) {
+        for (const [rr, q] of [[0, 0], [0, 1], [1, 0], [1, 1]]) h.cells.push({ key: `u${o}`, j: (2 * r + rr) * N + 2 * c + q, mark: 'in' });
+        h.kernels.push({ key: `up ${o} ${ch}`, mark: 'in' });
+      }
     if (m === 'p') {
-      for (let o = 0; o < C; o++) window('b', o, r, c, M, 1, 'in');
-      for (let o = 0; o < C; o++) h.kernels.push({ key: `mid ${o} ${ch}`, mark: 'in' });
+      for (let o = 0; o < CH.b; o++) window('b', o, r, c, M, 1, 'in');
+      for (let o = 0; o < CH.b; o++) h.kernels.push({ key: `mid ${o} ${ch}`, mark: 'in' });
     }
   }
   return h;
@@ -484,7 +544,7 @@ export function receptiveField(m, ch, r, c, cut) {
     const s = (f[key] ??= new Map());
     s.set(j, (s.get(j) ?? 0) | bits);
   };
-  const chans = (/** @type {MapName} */ mm) => (mm === 'x' || mm === 'y' ? [0] : Array.from({ length: C }, (_, k) => k));
+  const chans = (/** @type {MapName} */ mm) => Array.from({ length: CH[mm] }, (_, k) => k);
   add(`${m}${ch}`, r * size(m) + c, PLAIN);
   /** conv: every channel of `from` in the 3×3 (or 1×1) window of every marked neuron of `to` */
   const conv = (/** @type {MapName} */ to, /** @type {MapName} */ from, /** @type {number} */ hh, /** @type {(b: number) => number} */ tag) => {
@@ -506,7 +566,8 @@ export function receptiveField(m, ch, r, c, cut) {
   conv('y', 'd', 0, same);
   if (!cut.deep) conv('d', 'u', 1, b => (b & PLAIN ? DEEPB : b));
   if (!cut.skip) conv('d', 'e', 1, b => (b & PLAIN ? SKIPB : b));
-  for (const i of chans('u')) for (const [j, bits] of f[`u${i}`] ?? []) add(`b${i}`, (Math.floor(j / N) >> 1) * M + ((j % N) >> 1), bits);
+  // the up-conv: each u neuron hears from one position of every bottleneck map
+  for (const o of chans('u')) for (const [j, bits] of f[`u${o}`] ?? []) for (const i of chans('b')) add(`b${i}`, (Math.floor(j / N) >> 1) * M + ((j % N) >> 1), bits);
   conv('b', 'p', 1, same);
   for (const i of chans('p'))
     for (const [j, bits] of f[`p${i}`] ?? []) {

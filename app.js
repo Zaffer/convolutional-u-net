@@ -150,7 +150,7 @@ function followStep() {
   const n0 = from.map === 'p' || from.map === 'b' ? net.M : net.N;
   const n1 = m === 'p' || m === 'b' ? net.M : net.N;
   const scale = (/** @type {number} */ v) => Math.min(n1 - 1, Math.floor((v * n1) / n0));
-  ui.sel({ kind: 'neuron', map: m, ch: m === 'x' || m === 'y' ? 0 : Math.min(from.ch, net.C - 1), r: scale(from.r), c: scale(from.c) });
+  ui.sel({ kind: 'neuron', map: m, ch: Math.min(from.ch, net.CH[m] - 1), r: scale(from.r), c: scale(from.c) });
 }
 
 const actions = {
@@ -227,7 +227,7 @@ effect(() => {
     const ready = T && stage >= (grad ? BACK[m] : FWD[m]) && (!grad || G);
     const maps = ready ? /** @type {Float64Array[]} */ (grad ? /** @type {net.Grads} */ (G)[/** @type {keyof net.Grads} */ (m)] : T[m]) : null;
     const scale = !maps ? 1 : data || (m === 'y' && !grad) ? 1 : maxAbs(maps);
-    (maps ?? [null, null]).slice(0, m === 'x' || m === 't' || m === 'y' ? 1 : net.C).forEach((values, ch) => (shown[`${m}${ch}`] = { values, scale }));
+    for (let ch = 0; ch < net.CH[m]; ch++) shown[`${m}${ch}`] = { values: maps ? maps[ch] : null, scale };
   }
   netView.setMaps(shown);
 });
