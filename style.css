@@ -34,7 +34,7 @@ pre { font-size: 11px; line-height: 1.35; overflow: auto; margin: 4px 0 0; }
 
 .split { display: none; }
 
-/* wide screens: left | centre | right, with the bottom panel under the centre and right.
+/* wide screens: left | centre | right, with the bottom panel across the full width.
    The bars between them are the splitters; their sizes are CSS variables the drag sets. */
 @media (min-width: 900px) {
   body { height: 100dvh; display: flex; flex-direction: column; }
@@ -45,9 +45,9 @@ pre { font-size: 11px; line-height: 1.35; overflow: auto; margin: 4px 0 0; }
     grid-template-columns: clamp(160px, var(--left), 45vw) var(--gap) minmax(0, 1fr) var(--gap) clamp(160px, var(--right), 45vw);
     grid-template-rows: minmax(0, 1fr) var(--gap) clamp(100px, var(--bottom), 70vh);
     grid-template-areas:
-      "left lbar centre rbar right"
-      "left lbar bbar   bbar bbar"
-      "left lbar bottom bottom bottom";
+      "left   lbar   centre rbar   right"
+      "bbar   bbar   bbar   bbar   bbar"
+      "bottom bottom bottom bottom bottom";
   }
   main > section { min-width: 0; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: var(--gap); padding-top: var(--gap); }
   #left { grid-area: left; }
@@ -62,10 +62,12 @@ pre { font-size: 11px; line-height: 1.35; overflow: auto; margin: 4px 0 0; }
   [data-split=right] { grid-area: rbar; cursor: col-resize; }
   [data-split=bottom] { grid-area: bbar; cursor: row-resize; }
 
-  /* the drawings fill their panel, scaled to fit */
-  #netBox, #inspBox, #bottom > fieldset { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
-  #netBox svg, #bottom svg { flex: 1; min-height: 0; height: 100%; }
+  /* the drawings fill their panel, scaled to fit; the inspector takes what the test images leave */
+  #netBox, #inspBox, #lossBox, #weightBox { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+  #netBox svg, #lossBox svg, #weightBox svg { flex: 1; min-height: 0; height: 100%; }
   #inspBox pre { flex: 1; min-height: 0; }
+  #testBox, #editBox { flex: none; }
+  #editBox { width: 20em; overflow: auto; }
 }
 
 /* phones: one column, in the order you use it. The network, the weight editor and the weights

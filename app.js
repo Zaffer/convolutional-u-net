@@ -97,7 +97,7 @@ const chartData = computed(() => {
 const views = {
   samples: computed(() => String(state.samples())),
   next: computed(() => STAGES[(state.stage() + 1) % STAGES.length].label),
-  done: computed(() => (state.stage() < 0 ? 'none yet' : STAGES[state.stage()].label)),
+  done: computed(() => (state.stage() < 0 ? 'None yet' : STAGES[state.stage()].label)),
   taskAbout: computed(() => TASKS[train.task()].about),
   alpha: computed(() => train.alpha().toFixed(3)),
   speed: computed(() => {
@@ -125,7 +125,7 @@ const views = {
   pauseLocked: computed(() => !state.playing()),
   editName: computed(() => {
     const s = ui.sel();
-    return s && s.kind !== 'neuron' ? paramLabel(s) : 'nothing yet: tap a weight or bias';
+    return s && s.kind !== 'neuron' ? paramLabel(s) : 'Nothing yet: tap a weight or bias';
   }),
   editValue: computed(() => edit.value().toFixed(2)),
   editLocked: computed(() => state.playing() || ui.sel()?.kind === 'neuron' || !ui.sel()),
@@ -136,7 +136,7 @@ const views = {
   undoLocked: computed(() => state.playing() || edit.orig().size === 0),
   edited: computed(() => {
     const n = edit.orig().size;
-    return n === 0 ? 'none' : `${n} weight${n === 1 ? '' : 's'} (the next update clears this)`;
+    return n === 0 ? 'None' : `${n} weight${n === 1 ? '' : 's'} (the next update clears this)`;
   }),
 };
 

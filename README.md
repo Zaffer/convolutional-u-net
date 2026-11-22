@@ -1,6 +1,6 @@
-# convolutional U-net
+# Convolutional U-Net
 
-The smallest U-net that is still a U-net, learning on 8×8 images, with every neuron and every
+The smallest U-Net that is still a U-Net, learning on 8×8 images, with every neuron and every
 weight on screen.
 
 **Live: https://zaffer.github.io/convolutional-u-net/**
@@ -13,7 +13,7 @@ x (1×8×8) ─conv 3×3, ReLU─▶ e (2×8×8) ──────────�
                                                                                 d ─conv 1×1, sigmoid─▶ y (1×8×8)
 ```
 
-207 weights. As in real U-nets, the channels double where the resolution halves, and a learned
+207 weights. As in real U-Nets, the channels double where the resolution halves, and a learned
 up-convolution (a 2×2 transposed convolution) halves them again on the way back up. Trained one
 sample at a time by plain gradient descent, w ← w − α·∂L/∂w, on binary cross-entropy.
 

@@ -9,17 +9,17 @@ import { N } from './net.js';
 /** @type {Record<Task, { label: string, about: string }>} */
 export const TASKS = {
   outline: {
-    label: '🔲 outline',
+    label: '🔲 Outline',
     about:
       'Keep only the edge of the square. Each output pixel can decide from its own small neighbourhood, but it needs that neighbourhood at full resolution: the skip connection carries it. Cut the skip and it gets close, about 97% of pixels, but rarely every pixel: the learned up-conv carries some detail up from the bottleneck, the skip carries all of it. Cut the bottleneck and it usually still learns.',
   },
   big: {
-    label: '🔍 big only',
+    label: '🔍 Big only',
     about:
       'Keep the square if it is 5 or more wide, erase it if it is smaller. A pixel cannot tell how big its square is from a 5×5 window, which is all the skip path sees. The bottleneck path sees the whole image. Cut the bottleneck and it stalls around 95%; cut the skip and it still learns.',
   },
   denoise: {
-    label: '🧹 denoise',
+    label: '🧹 Denoise',
     about: 'Remove the speckles: one pixel in ten is flipped. Detail and context both help.',
   },
 };

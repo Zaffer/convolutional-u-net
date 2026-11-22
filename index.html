@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>convolutional U-net</title>
-<meta name="description" content="A tiny U-net learning on 8×8 images, one neuron and one weight at a time.">
+<title>Convolutional U-Net</title>
+<meta name="description" content="A tiny U-Net learning on 8×8 images, one neuron and one weight at a time.">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="./style.css">
@@ -16,14 +16,14 @@
 <body>
 
 <header id="top">
-  <strong>convolutional U-net</strong>
-  <button popovertarget="about">❔ about</button>
+  <strong>Convolutional U-Net</strong>
+  <button popovertarget="about">❔ About</button>
   <div popover id="about">
-    <p>A U-net turns an image into another image of the same size. This one is as small as a U-net
+    <p>A U-Net turns an image into another image of the same size. This one is as small as a U-Net
       can be: 8×8 pictures, 207 weights. Small enough to see every number.</p>
     <p><b>The shape.</b> The encoder (left) looks at the picture through 3×3 windows. Max-pooling
       halves the resolution, so the bottleneck (bottom) sees the whole picture coarsely. As in real
-      U-nets, the channels double where the resolution halves: 2 at full resolution, 4 in the
+      U-Nets, the channels double where the resolution halves: 2 at full resolution, 4 in the
       bottleneck. A learned 2×2 up-convolution brings it back up to 2 channels at full resolution,
       and the <b>skip connection</b> hands the decoder (right) the encoder’s full-resolution map as
       well: coarse context from the bottom, fine detail from across.</p>
@@ -43,98 +43,98 @@
     <p>Source: <a href="https://github.com/Zaffer/convolutional-u-net">github.com/Zaffer/convolutional-u-net</a></p>
   </div>
   <span>
-    <button data-on="click:actions.step" data-disabled="views.stepLocked">➡️ step</button>
-    <button data-on="click:actions.sample" data-disabled="views.stepLocked">⏭️ finish sample</button>
+    <button data-on="click:actions.step" data-disabled="views.stepLocked">➡️ Step</button>
+    <button data-on="click:actions.sample" data-disabled="views.stepLocked">⏭️ Finish sample</button>
     <button data-on="click:actions.hundred" data-disabled="views.stepLocked">⏩ 100 samples</button>
-    <button data-on="click:actions.play" data-disabled="views.stepLocked">▶️ play</button>
-    <button data-on="click:actions.pause" data-disabled="views.pauseLocked">⏸️ pause</button>
-    <button data-on="click:actions.reset">🔄 new weights</button>
+    <button data-on="click:actions.play" data-disabled="views.stepLocked">▶️ Play</button>
+    <button data-on="click:actions.pause" data-disabled="views.pauseLocked">⏸️ Pause</button>
+    <button data-on="click:actions.reset">🔄 New weights</button>
   </span>
-  <label id="count">samples <output data-text="views.samples"></output></label>
+  <label id="count">Samples <output data-text="views.samples"></output></label>
 </header>
 
 <main>
   <section id="left">
     <fieldset id="trainBox">
-      <legend>training</legend>
-      <div>task:
-        <label><input type="radio" name="task" value="outline" data-bind="train.task"> 🔲 outline</label>
-        <label><input type="radio" name="task" value="big" data-bind="train.task"> 🔍 big only</label>
-        <label><input type="radio" name="task" value="denoise" data-bind="train.task"> 🧹 denoise</label>
+      <legend>Training</legend>
+      <div>Task:
+        <label><input type="radio" name="task" value="outline" data-bind="train.task"> 🔲 Outline</label>
+        <label><input type="radio" name="task" value="big" data-bind="train.task"> 🔍 Big only</label>
+        <label><input type="radio" name="task" value="denoise" data-bind="train.task"> 🧹 Denoise</label>
       </div>
       <p><small><output data-text="views.taskAbout"></output></small></p>
-      <div>paths into the decoder:
-        <label><input type="checkbox" switch data-bind="train.skip"> ↪️ skip connection</label>
-        <label><input type="checkbox" switch data-bind="train.deep"> ⤵️ bottleneck</label>
+      <div>Paths into the decoder:
+        <label><input type="checkbox" switch data-bind="train.skip"> ↪️ Skip connection</label>
+        <label><input type="checkbox" switch data-bind="train.deep"> ⤵️ Bottleneck</label>
       </div>
-      <div><label for="alphaIn">learning rate α <output data-text="views.alpha"></output><br>
+      <div><label for="alphaIn">Learning rate α <output data-text="views.alpha"></output><br>
         <input id="alphaIn" type="range" min="0.0005" max="0.02" step="0.0005" data-bind="train.alpha"></label></div>
-      <div><label for="speedIn">play speed <output data-text="views.speed"></output><br>
+      <div><label for="speedIn">Play speed <output data-text="views.speed"></output><br>
         <input id="speedIn" type="range" min="-4" max="10" step="1" data-bind="train.speed"></label></div>
     </fieldset>
     <fieldset id="viewBox">
-      <legend>view</legend>
-      <div>colour by:
-        <label><input type="radio" name="mode" value="value" data-bind="ui.mode"> 🔵 value</label>
-        <label><input type="radio" name="mode" value="grad" data-bind="ui.mode"> 📉 gradient</label>
+      <legend>View</legend>
+      <div>Colour by:
+        <label><input type="radio" name="mode" value="value" data-bind="ui.mode"> 🔵 Value</label>
+        <label><input type="radio" name="mode" value="grad" data-bind="ui.mode"> 📉 Gradient</label>
       </div>
-      <div><label><input type="checkbox" data-bind="ui.field"> 🎯 receptive field</label></div>
-      <div><label><input type="checkbox" data-bind="ui.follow"> 📍 follow each step</label></div>
-      <div><label><input type="checkbox" data-bind="ui.noCss"> 🚫 no CSS</label></div>
+      <div><label><input type="checkbox" data-bind="ui.field"> 🎯 Receptive field</label></div>
+      <div><label><input type="checkbox" data-bind="ui.follow"> 📍 Follow each step</label></div>
+      <div><label><input type="checkbox" data-bind="ui.noCss"> 🚫 No CSS</label></div>
     </fieldset>
     <fieldset id="keyBox">
-      <legend>key</legend>
-      <div>🟦 positive, 🟥 negative; stronger colour, bigger number. Blank: not computed yet.</div>
-      <div>▣ selected · ⬚ dashed: what it reads (forward) or feeds (backward)</div>
-      <div>🎯 receptive field, every input that can reach the selected neuron:
+      <legend>Key</legend>
+      <div>🟦 Positive, 🟥 negative; stronger colour, bigger number. Blank: not computed yet.</div>
+      <div>▣ Selected · ⬚ dashed: what it reads (forward) or feeds (backward)</div>
+      <div>🎯 Receptive field: every input that can reach the selected neuron:
         🟪 through the bottleneck,
         🟧 through the skip connection, both colours: both.</div>
       <div>Each map is scaled to its own largest value; the inspector has the exact numbers.</div>
     </fieldset>
   </section>
-  <div class="split" data-split="left" role="separator" aria-orientation="vertical" aria-label="resize the left panel" tabindex="0"></div>
+  <div class="split" data-split="left" role="separator" aria-orientation="vertical" aria-label="Resize the left panel" tabindex="0"></div>
   <section id="centre">
     <fieldset id="netBox">
-      <legend>network: tap a neuron</legend>
-      <svg id="net" role="img" aria-label="the U-net: every neuron of every map"></svg>
+      <legend>Network: tap a neuron</legend>
+      <svg id="net" role="img" aria-label="The U-Net: every neuron of every map"></svg>
     </fieldset>
   </section>
-  <div class="split" data-split="right" role="separator" aria-orientation="vertical" aria-label="resize the right panel" tabindex="0"></div>
+  <div class="split" data-split="right" role="separator" aria-orientation="vertical" aria-label="Resize the right panel" tabindex="0"></div>
   <section id="right">
-    <fieldset id="editBox">
-      <legend>✏️ edit a weight</legend>
-      <div class="line">editing: <output data-text="views.editName"></output></div>
-      <div><label for="editIn">value <output data-text="views.editValue"></output><br>
-        <input id="editIn" type="range" min="-4" max="4" step="0.01" data-bind="edit.value" data-on="input:actions.nudge" data-disabled="views.editLocked"></label></div>
-      <div>
-        <button data-on="click:actions.restore" data-disabled="views.restoreLocked">↩️ put this one back</button>
-        <button data-on="click:actions.undoAll" data-disabled="views.undoLocked">⏪ undo all edits</button>
-      </div>
-      <div class="line">edited: <output data-text="views.edited"></output></div>
-      <p><small>Moving a weight reruns this sample’s forward pass with it: watch the maps, the output, the loss and the test images.</small></p>
-    </fieldset>
     <fieldset id="inspBox">
-      <legend>🔍 inspector</legend>
-      <div class="stage">done: <output data-text="views.done"></output></div>
-      <div class="stage">next: <output data-text="views.next"></output></div>
+      <legend>🔍 Inspector</legend>
+      <div class="stage">Done: <output data-text="views.done"></output></div>
+      <div class="stage">Next: <output data-text="views.next"></output></div>
       <pre data-text="views.inspect"></pre>
     </fieldset>
-  </section>
-  <div class="split" data-split="bottom" role="separator" aria-orientation="horizontal" aria-label="resize the bottom panel" tabindex="0"></div>
-  <section id="bottom">
-    <fieldset id="weightBox">
-      <legend>weights: tap one</legend>
-      <svg id="weights" role="img" aria-label="every weight and bias"></svg>
-    </fieldset>
-    <fieldset id="lossBox">
-      <legend>loss</legend>
-      <div class="line">this sample <output data-text="views.loss"></output> · last 200 <output data-text="views.avgLoss"></output> · chart top <output data-text="views.chartTop"></output></div>
-      <svg id="loss" role="img" aria-label="loss per sample over training"></svg>
-    </fieldset>
     <fieldset id="testBox">
-      <legend>test images</legend>
+      <legend>Test images</legend>
       <div class="line"><output data-text="views.test"></output></div>
-      <svg id="tests" role="img" aria-label="four test images: input, output, target"></svg>
+      <svg id="tests" role="img" aria-label="Four test images: input, output, target"></svg>
+    </fieldset>
+  </section>
+  <div class="split" data-split="bottom" role="separator" aria-orientation="horizontal" aria-label="Resize the bottom panel" tabindex="0"></div>
+  <section id="bottom">
+    <fieldset id="lossBox">
+      <legend>Loss</legend>
+      <div class="line">This sample <output data-text="views.loss"></output> · last 200 <output data-text="views.avgLoss"></output> · chart top <output data-text="views.chartTop"></output></div>
+      <svg id="loss" role="img" aria-label="Loss per sample over training"></svg>
+    </fieldset>
+    <fieldset id="weightBox">
+      <legend>Weights: tap one</legend>
+      <svg id="weights" role="img" aria-label="Every weight and bias"></svg>
+    </fieldset>
+    <fieldset id="editBox">
+      <legend>✏️ Edit a weight</legend>
+      <div class="line">Editing: <output data-text="views.editName"></output></div>
+      <div><label for="editIn">Value <output data-text="views.editValue"></output><br>
+        <input id="editIn" type="range" min="-4" max="4" step="0.01" data-bind="edit.value" data-on="input:actions.nudge" data-disabled="views.editLocked"></label></div>
+      <div>
+        <button data-on="click:actions.restore" data-disabled="views.restoreLocked">↩️ Put this one back</button>
+        <button data-on="click:actions.undoAll" data-disabled="views.undoLocked">⏪ Undo all edits</button>
+      </div>
+      <div class="line">Edited: <output data-text="views.edited"></output></div>
+      <p><small>Moving a weight reruns this sample’s forward pass with it: watch the maps, the output, the loss and the test images.</small></p>
     </fieldset>
   </section>
 </main>

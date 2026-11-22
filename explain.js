@@ -19,20 +19,20 @@ import { mapName, SUB } from './view.js';
  * computes.
  */
 export const STAGES = /** @type {const} */ ([
-  { label: '⓪ load a sample: input x, target t', dir: 'fwd', shows: 'x' },
-  { label: '① encoder conv 3×3 + ReLU → e', dir: 'fwd', shows: 'e' },
-  { label: '② max-pool 2×2 → p', dir: 'fwd', shows: 'p' },
-  { label: '③ bottleneck conv 3×3 + ReLU → b', dir: 'fwd', shows: 'b' },
-  { label: '④ up-conv 2×2: 4 channels back to 2, at double resolution → u', dir: 'fwd', shows: 'u' },
-  { label: '⑤ decoder conv 3×3 + ReLU, reading u and the skip copy of e → d', dir: 'fwd', shows: 'd' },
-  { label: '⑥ output conv 1×1 + sigmoid → y, and the loss', dir: 'fwd', shows: 'y' },
-  { label: '⑦ output error y − t, and the output weights’ gradients', dir: 'back', shows: 'y', weights: 'out' },
-  { label: '⑧ back through the output conv → ∂L/∂d, and the decoder weights’ gradients', dir: 'back', shows: 'd', weights: 'dec' },
-  { label: '⑨ back through the decoder conv → ∂L/∂u, along the skip connection, and the up-conv weights’ gradients', dir: 'back', shows: 'u', weights: 'up' },
-  { label: '⑩ back through the up-conv → ∂L/∂b, and the bottleneck weights’ gradients', dir: 'back', shows: 'b', weights: 'mid' },
-  { label: '⑪ back through the bottleneck conv → ∂L/∂p', dir: 'back', shows: 'p' },
-  { label: '⑫ back through the pool, plus the skip → ∂L/∂e, and the encoder weights’ gradients', dir: 'back', shows: 'e', weights: 'enc' },
-  { label: '⑬ update every weight: w ← w − α·∂L/∂w', dir: 'update' },
+  { label: '⓪ Load a sample: input x, target t', dir: 'fwd', shows: 'x' },
+  { label: '① Encoder conv 3×3 + ReLU → e', dir: 'fwd', shows: 'e' },
+  { label: '② Max-pool 2×2 → p', dir: 'fwd', shows: 'p' },
+  { label: '③ Bottleneck conv 3×3 + ReLU → b', dir: 'fwd', shows: 'b' },
+  { label: '④ Up-conv 2×2: 4 channels back to 2, at double resolution → u', dir: 'fwd', shows: 'u' },
+  { label: '⑤ Decoder conv 3×3 + ReLU, reading u and the skip copy of e → d', dir: 'fwd', shows: 'd' },
+  { label: '⑥ Output conv 1×1 + sigmoid → y, and the loss', dir: 'fwd', shows: 'y' },
+  { label: '⑦ Output error y − t, and the output weights’ gradients', dir: 'back', shows: 'y', weights: 'out' },
+  { label: '⑧ Back through the output conv → ∂L/∂d, and the decoder weights’ gradients', dir: 'back', shows: 'd', weights: 'dec' },
+  { label: '⑨ Back through the decoder conv → ∂L/∂u, along the skip connection, and the up-conv weights’ gradients', dir: 'back', shows: 'u', weights: 'up' },
+  { label: '⑩ Back through the up-conv → ∂L/∂b, and the bottleneck weights’ gradients', dir: 'back', shows: 'b', weights: 'mid' },
+  { label: '⑪ Back through the bottleneck conv → ∂L/∂p', dir: 'back', shows: 'p' },
+  { label: '⑫ Back through the pool, plus the skip → ∂L/∂e, and the encoder weights’ gradients', dir: 'back', shows: 'e', weights: 'enc' },
+  { label: '⑬ Update every weight: w ← w − α·∂L/∂w', dir: 'update' },
 ]);
 export const LAST = STAGES.length - 1;
 
@@ -76,7 +76,7 @@ const wName = (/** @type {LayerId} */ id, /** @type {number} */ o, /** @type {nu
 export const paramLabel = sel => {
   const L = LAYERS[sel.layer];
   return sel.kind === 'bias'
-    ? `bias b[${mapName(L.to, sel.o)}]`
+    ? `Bias b[${mapName(L.to, sel.o)}]`
     : `${wName(sel.layer, sel.o, sel.i)}, kernel row ${Math.floor(sel.k / L.ks)}, column ${sel.k % L.ks}`;
 };
 /** @param {MapName} m @param {Trace} T */
@@ -91,18 +91,18 @@ export function explain(sel, ctx) {
   const { T, G, stage, mode } = ctx;
   const { map: m, ch, r, c } = sel;
   const head = `${mapName(m, ch)} at row ${r}, column ${c}  (${NAMES[m]})`;
-  if (!T || stage < FWD[m]) return `${head}\n\nnot computed yet: stage ${STAGES[FWD[m]].label.slice(0, 1)} computes it.`;
+  if (!T || stage < FWD[m]) return `${head}\n\nNot computed yet: stage ${STAGES[FWD[m]].label.slice(0, 1)} computes it.`;
   if (mode === 'grad') {
     if (m === 'x' || m === 't') return `${head}\n\nThis is data, not a neuron: nothing upstream to train, so no gradient.`;
-    if (!G || stage < BACK[m]) return `${head}\n\nits gradient is not computed yet: the backward pass reaches it at stage ${STAGES[BACK[m]].label.slice(0, 1)}.`;
+    if (!G || stage < BACK[m]) return `${head}\n\nIts gradient is not computed yet: the backward pass reaches it at stage ${STAGES[BACK[m]].label.slice(0, 1)}.`;
     return `${head}\n\n${gradText(m, ch, r, c, ctx)}`;
   }
   return `${head}\n\n${valueText(m, ch, r, c, ctx)}`;
 }
 
 const NAMES = /** @type {Record<MapName, string>} */ ({
-  x: 'input pixel', t: 'target pixel', e: 'encoder conv 3×3, ReLU', p: 'max-pool 2×2', b: 'bottleneck conv 3×3, ReLU',
-  u: 'up-conv 2×2', d: 'decoder conv 3×3, ReLU', y: 'output conv 1×1, sigmoid',
+  x: 'Input pixel', t: 'Target pixel', e: 'Encoder conv 3×3, ReLU', p: 'Max-pool 2×2', b: 'Bottleneck conv 3×3, ReLU',
+  u: 'Up-conv 2×2', d: 'Decoder conv 3×3, ReLU', y: 'Output conv 1×1, sigmoid',
 });
 
 /** How the forward pass computed this neuron. */
@@ -110,8 +110,8 @@ function valueText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type
   const T = /** @type {Trace} */ (ctx.T);
   const n = size(m);
   const j = r * n + c;
-  if (m === 'x') return `input pixel = ${T.x[0][j]}\nthe picture the network is given.`;
-  if (m === 't') return `target pixel = ${T.t[0][j]}\nwhat the output y should be here.`;
+  if (m === 'x') return `Input pixel = ${T.x[0][j]}\nThe picture the network is given.`;
+  if (m === 't') return `Target pixel = ${T.t[0][j]}\nWhat the output y should be here.`;
   if (m === 'p') {
     const src = T.e[ch];
     const win = [[2 * r, 2 * c], [2 * r, 2 * c + 1], [2 * r + 1, 2 * c], [2 * r + 1, 2 * c + 1]];
@@ -121,7 +121,7 @@ function valueText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type
       return k === best ? `[${src[k].toFixed(3)}]` : ` ${src[k].toFixed(3)} `;
     };
     return [
-      `the largest of these 4 neurons of e${SUB[ch]}`,
+      `The largest of these 4 neurons of e${SUB[ch]}`,
       `(rows ${2 * r}–${2 * r + 1}, columns ${2 * c}–${2 * c + 1}):`,
       '',
       `  ${cell(win[0])} ${cell(win[1])}`,
@@ -139,7 +139,7 @@ function valueText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type
     const Q = c >> 1;
     const a = r & 1;
     const cc = c & 1;
-    if (T.cut.deep) return '✂️ the bottleneck path is cut: the decoder gets 0 here\ninstead of the up-conv’s output.';
+    if (T.cut.deep) return '✂️ The bottleneck path is cut: the decoder gets 0 here\ninstead of the up-conv’s output.';
     const lines = [
       `The up-conv works backwards from a conv: each bottleneck`,
       `position (${R},${Q}) writes into a 2×2 block of u, rows ${2 * R}–${2 * R + 1},`,
@@ -157,7 +157,7 @@ function valueText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type
     const b = ctx.P.up.b[ch];
     lines.push(
       '',
-      `${`sum of the ${CH.b}`.padEnd(19)}${v3(sum)}`,
+      `${`Sum of the ${CH.b}`.padEnd(19)}${v3(sum)}`,
       `${`+ bias b[u${SUB[ch]}]`.padEnd(19)}${v3(b)}`,
       `${'= u'.padEnd(19)}${v3(sum + b)}   (no activation)`,
       '',
@@ -165,7 +165,7 @@ function valueText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type
       'weights decide what each corner of the block gets, so',
       'the bottleneck can say more than “something here”.',
     );
-    if (ctx.stage === LAST) lines.push('', '(the weights have just been updated; these are the new ones.\nThe values on screen came from the old ones.)');
+    if (ctx.stage === LAST) lines.push('', '(The weights have just been updated; these are the new ones.\nThe values on screen came from the old ones.)');
     return lines.join('\n');
   }
   return convText(/** @type {LayerId} */ (layerWriting(m)), ch, r, c, ctx);
@@ -183,7 +183,7 @@ function convText(/** @type {LayerId} */ id, /** @type {number} */ o, /** @type 
   /** @type {number[]} */
   const parts = [];
   if (L.ks === 1) {
-    lines.push(`one weight per input map, at this same pixel:`, '');
+    lines.push(`One weight per input map, at this same pixel:`, '');
     inputs.forEach(([m, ch], i) => {
       const x = recv[i][r * n + c];
       const w = ctx.P[id].w[o][i][0];
@@ -191,14 +191,14 @@ function convText(/** @type {LayerId} */ id, /** @type {number} */ o, /** @type 
       lines.push(`  ${mapName(m, ch)} ${u3(x)} × ${wName(id, o, i)} ${v3(w)} = ${v3(x * w)}`);
     });
   } else {
-    lines.push(`a 3×3 window of each of its ${plural(inputs.length, 'input map')},`, 'times that map’s 3×3 kernel. · is padding (0).');
+    lines.push(`A 3×3 window of each of its ${plural(inputs.length, 'input map')},`, 'times that map’s 3×3 kernel. · is padding (0).');
     inputs.forEach(([m, ch], i) => {
       const k = ctx.P[id].w[o][i];
       const src = recv[i];
       let s = 0;
       const note =
-        id === 'dec' ? (m === 'u' ? (T.cut.deep ? '  ✂️ cut: zeros' : '  bottleneck path') : T.cut.skip ? '  ✂️ cut: zeros' : '  skip connection') : '';
-      lines.push('', `from ${mapName(m, ch)}${note}`, `   window                   kernel ${wName(id, o, i)}`);
+        id === 'dec' ? (m === 'u' ? (T.cut.deep ? '  ✂️ Cut: zeros' : '  Bottleneck path') : T.cut.skip ? '  ✂️ Cut: zeros' : '  Skip connection') : '';
+      lines.push('', `From ${mapName(m, ch)}${note}`, `   Window                   Kernel ${wName(id, o, i)}`);
       for (let dr = -h; dr <= h; dr++) {
         const win = [];
         const ker = [];
@@ -224,19 +224,19 @@ function convText(/** @type {LayerId} */ id, /** @type {number} */ o, /** @type 
   const pre = sum + b;
   const out = /** @type {Float64Array[]} */ (T[L.to])[o][r * n + c];
   // after an update the forward pass on screen used the old weights; say so rather than show a mismatch
-  const stale = ctx.stage === LAST ? '\n(the weights have just been updated; these are the new ones.\nThe values on screen came from the old ones.)' : '';
+  const stale = ctx.stage === LAST ? '\n(The weights have just been updated; these are the new ones.\nThe values on screen came from the old ones.)' : '';
   lines.push(
     '',
-    `${`sum of the ${parts.length}`.padEnd(19)}${v3(sum)}`,
+    `${`Sum of the ${parts.length}`.padEnd(19)}${v3(sum)}`,
     `${`+ bias b[${mapName(L.to, o)}]`.padEnd(19)}${v3(b)}`,
     `${'= pre-activation'.padEnd(19)}${v3(pre)}`,
-    L.act === 'ReLU' ? `ReLU: max(0, ${v3(pre)}) = ${Math.max(0, pre).toFixed(3)}` : `sigmoid: 1 / (1 + e^${pre < 0 ? '+' : '−'}${Math.abs(pre).toFixed(3)}) = ${(1 / (1 + Math.exp(-pre))).toFixed(3)}`,
+    L.act === 'ReLU' ? `ReLU: max(0, ${v3(pre)}) = ${Math.max(0, pre).toFixed(3)}` : `Sigmoid: 1 / (1 + e^${pre < 0 ? '+' : '−'}${Math.abs(pre).toFixed(3)}) = ${(1 / (1 + Math.exp(-pre))).toFixed(3)}`,
   );
   if (stale) lines.push(stale);
-  else if (Math.abs(out - (L.act === 'ReLU' ? Math.max(0, pre) : 1 / (1 + Math.exp(-pre)))) > 1e-9) lines.push('', '(mismatch: the weights changed since this pass)');
+  else if (Math.abs(out - (L.act === 'ReLU' ? Math.max(0, pre) : 1 / (1 + Math.exp(-pre)))) > 1e-9) lines.push('', '(Mismatch: the weights changed since this pass)');
   if (L.to === 'y') {
     const t = T.t[0][r * n + c];
-    lines.push('', `target t = ${t}: ${Math.round(out) === t ? '✅ right' : '❌ wrong'} (rounds to ${Math.round(out)})`);
+    lines.push('', `Target t = ${t}: ${Math.round(out) === t ? '✅ Right' : '❌ Wrong'} (rounds to ${Math.round(out)})`);
   }
   return lines.join('\n');
 }
@@ -293,8 +293,8 @@ function gradText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type 
     const loss = -(t * Math.log(q) + (1 - t) * Math.log(1 - q));
     return [
       intro,
-      `output y = ${y.toFixed(3)}, target t = ${t}`,
-      `this pixel’s loss = −[t·ln y + (1−t)·ln(1−y)] = ${loss.toFixed(3)}`,
+      `Output y = ${y.toFixed(3)}, target t = ${t}`,
+      `This pixel’s loss = −[t·ln y + (1−t)·ln(1−y)] = ${loss.toFixed(3)}`,
       '',
       'With a sigmoid and this loss, the gradient at the',
       'pre-activation is simply the error:',
@@ -309,15 +309,15 @@ function gradText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type 
     return [intro, `d${SUB[ch]} feeds only y at this pixel, through ${wName('out', 0, ch)}:`, ...termLines(terms), `∂L/∂d${SUB[ch]} = ${v3(G.d[ch][j])}`, '', reluGate(G.dPre[ch][j], T.dPre[ch][j], `d${SUB[ch]}`)].join('\n');
   }
   if (m === 'u') {
-    if (T.cut.deep) return `${intro}\n✂️ the bottleneck path is cut: u feeds nothing, so ∂L/∂u = 0.`;
+    if (T.cut.deep) return `${intro}\n✂️ The bottleneck path is cut: u feeds nothing, so ∂L/∂u = 0.`;
     const terms = backTerms('dec', ch, r, c, ctx);
     return [
       intro,
       'u feeds every decoder neuron whose 3×3 window covers it.',
-      'each term: δ of that d neuron × the weight it reads u with',
+      'Each term: δ of that d neuron × the weight it reads u with',
       ...termLines(terms),
       `∂L/∂u${SUB[ch]} = ${v3(G.u[ch][j])}`,
-      '(the up-conv has no activation, so this is also its δ:',
+      '(The up-conv has no activation, so this is also its δ:',
       'the up-conv weights’ gradients are built from it)',
     ].join('\n');
   }
@@ -334,7 +334,7 @@ function gradText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type 
       intro,
       `b${SUB[ch]} wrote into a 2×2 block of each u map, through`,
       `one up-conv weight per neuron: ${terms.length} terms.`,
-      'each term: ∂L/∂ of that u neuron × the weight between them',
+      'Each term: ∂L/∂ of that u neuron × the weight between them',
       ...termLines(terms),
       `∂L/∂b${SUB[ch]} = ${v3(G.b[ch][j])}`,
       '',
@@ -346,10 +346,10 @@ function gradText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type 
     return [
       intro,
       'p feeds every bottleneck neuron whose 3×3 window covers it.',
-      'each term: δ of that b neuron × the weight it reads p with',
+      'Each term: δ of that b neuron × the weight it reads p with',
       ...termLines(terms),
       `∂L/∂p${SUB[ch]} = ${v3(G.p[ch][j])}`,
-      '(a pool has no activation, so nothing gates it)',
+      '(A pool has no activation, so nothing gates it)',
     ].join('\n');
   }
   // e: two roads back, through the pool and through the skip connection
@@ -361,12 +361,12 @@ function gradText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type 
     intro,
     `e${SUB[ch]} feeds two places, and its gradient adds both:`,
     '',
-    `1. the pool: p${SUB[ch]}${at(R, Q)} took the max of its 2×2 block,`,
+    `1. The pool: p${SUB[ch]}${at(R, Q)} took the max of its 2×2 block,`,
     won ? `   and this neuron won it, so it gets all of ∂L/∂p${SUB[ch]}${at(R, Q)} = ${v3(G.eFromPool[ch][j])}` : `   and this neuron did not win it, so it gets 0`,
     '',
-    T.cut.skip ? '2. the skip connection: ✂️ cut, so 0' : '2. the skip connection: decoder neurons read it directly.\n   each term: δ of that d neuron × its weight',
+    T.cut.skip ? '2. The skip connection: ✂️ cut, so 0' : '2. The skip connection: decoder neurons read it directly.\n   Each term: δ of that d neuron × its weight',
     ...(T.cut.skip ? [] : termLines(skipTerms, 6)),
-    T.cut.skip ? '' : `   from the skip: ${v3(G.skip[ch][j])}`,
+    T.cut.skip ? '' : `   From the skip: ${v3(G.skip[ch][j])}`,
     '',
     `∂L/∂e${SUB[ch]} = ${v3(G.eFromPool[ch][j])} ${G.skip[ch][j] < 0 ? '−' : '+'} ${Math.abs(G.skip[ch][j]).toFixed(3)} = ${v3(G.e[ch][j])}`,
     '',
@@ -392,19 +392,19 @@ function explainWeight(/** @type {Exclude<Selection, { kind: 'neuron' }>} */ sel
   const name = isBias ? `b[${out}]` : `${wName(id, o, i)}, kernel row ${Math.floor(k / L.ks)}, column ${k % L.ks}`;
   const now = isBias ? ctx.P[id].b[o] : ctx.P[id].w[o][i][k];
   const [im, ich] = inputsOf(id)[i];
-  const lines = [`${name}  (${id}: ${L.name})`, ''];
+  const lines = [`${name}  (${L.name})`, ''];
   const where = isBias
-    ? `added to every one of the ${n * n} ${out} neurons${L.act === 'none' ? '' : ` before the ${L.act}`}.`
+    ? `Added to every one of the ${n * n} ${out} neurons${L.act === 'none' ? '' : ` before the ${L.act}`}.`
     : isUp
-      ? `carries b${SUB[i]} into the ${corner(Math.floor(k / 2), k % 2)} neuron of each 2×2 block\nof ${out}: one weight, shared by all ${M * M} blocks.`
+      ? `Carries b${SUB[i]} into the ${corner(Math.floor(k / 2), k % 2)} neuron of each 2×2 block\nof ${out}: one weight, shared by all ${M * M} blocks.`
       : L.ks === 1
-      ? `multiplies ${mapName(im, ich)} at each pixel, into ${out} at that pixel.`
-      : `used by every one of the ${n * n} ${out} neurons: each multiplies\nthe ${mapName(im, ich)} neuron ${offset(dr, dc)} of itself by it.\nOne weight, shared across the whole image.`;
+      ? `Multiplies ${mapName(im, ich)} at each pixel, into ${out} at that pixel.`
+      : `Used by every one of the ${n * n} ${out} neurons: each multiplies\nthe ${mapName(im, ich)} neuron ${offset(dr, dc)} of itself by it.\nOne weight, shared across the whole image.`;
   lines.push(where, '');
   const updated = stage === LAST && ctx.before;
   const was = updated ? (isBias ? /** @type {Params} */ (ctx.before)[id].b[o] : /** @type {Params} */ (ctx.before)[id].w[o][i][k]) : now;
   if (!T || !G || stage < WGRAD[id]) {
-    lines.push(`value ${v3(now)}`, '', `its gradient is not computed yet: stage ${STAGES[WGRAD[id]].label.slice(0, 1)} computes it.`);
+    lines.push(`Value ${v3(now)}`, '', `Its gradient is not computed yet: stage ${STAGES[WGRAD[id]].label.slice(0, 1)} computes it.`);
     return lines.join('\n');
   }
   const dPre = dPreOf(G, id);
@@ -436,12 +436,12 @@ function explainWeight(/** @type {Exclude<Selection, { kind: 'neuron' }>} */ sel
       : isUp
         ? `∂L/∂w = Σ over the ${M * M} blocks of\n  ∂L/∂ of the ${out} neuron it wrote × the ${mapName(im, ich)} value it carried:`
         : `∂L/∂w = Σ over every position of\n  δ of the ${out} neuron there × the ${mapName(im, ich)} value it read:`,
-    isBias ? '' : `  ${'neuron'.padEnd(8)} ${'δ'.padStart(6)}   ${'input'.padStart(6)}`,
+    isBias ? '' : `  ${'Neuron'.padEnd(8)} ${'δ'.padStart(6)}   ${'Input'.padStart(6)}`,
     ...termLines(terms, 6).map(l => l.replace('those neurons’ ReLU was off', 'ReLU off or input 0')),
-    `total ${isBias ? '∂L/∂b' : '∂L/∂w'} = ${v3(g)}`,
+    `Total ${isBias ? '∂L/∂b' : '∂L/∂w'} = ${v3(g)}`,
     '',
-    `update: w − α·∂L/∂w = ${f4(was)} − ${alpha} × ${g < 0 ? `(${v3(g)})` : g.toFixed(3)} = ${f4(was - alpha * g)}`,
-    updated ? `✅ applied: it was ${f4(was)}, it is now ${f4(now)}` : 'applied at stage ⑬',
+    `Update: w − α·∂L/∂w = ${f4(was)} − ${alpha} × ${g < 0 ? `(${v3(g)})` : g.toFixed(3)} = ${f4(was - alpha * g)}`,
+    updated ? `✅ Applied: it was ${f4(was)}, it is now ${f4(now)}` : 'Applied at stage ⑬',
   );
   return lines.join('\n');
 }

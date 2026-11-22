@@ -1,5 +1,5 @@
 // @ts-check
-// A tiny U-net as pure functions. Every intermediate map and every gradient is kept, so the page
+// A tiny U-Net as pure functions. Every intermediate map and every gradient is kept, so the page
 // can show how each neuron got its value and how each weight is about to move.
 //
 //   x (1×8×8) ─enc conv 3×3, ReLU─▶ e (2×8×8) ──────────────── skip (copy) ─────────────────┐
@@ -8,7 +8,7 @@
 //                                                                              [u, e] ─dec conv 3×3, ReLU─▶ d (2×8×8)
 //                                                                                       d ─out conv 1×1, sigmoid─▶ y (1×8×8)
 //
-// As in real U-nets, the channels double where the resolution halves (the bottleneck has 4), and a
+// As in real U-Nets, the channels double where the resolution halves (the bottleneck has 4), and a
 // learned up-convolution halves them again on the way back up.
 //
 // A map is a Float64Array of n×n values, row-major. A tensor is an array of maps (channels).
@@ -34,11 +34,11 @@ export const CH = /** @type {const} */ ({ x: 1, t: 1, e: C, p: C, b: CB, u: C, d
  * writes its value, times a 2×2 kernel, into a 2×2 block of u.
  */
 export const LAYERS = /** @type {const} */ ({
-  enc: { name: 'encoder conv', from: ['x'], to: 'e', ks: 3, n: N, act: 'ReLU', ins: 1, outs: C },
-  mid: { name: 'bottleneck conv', from: ['p'], to: 'b', ks: 3, n: M, act: 'ReLU', ins: C, outs: CB },
-  up: { name: 'up-conv', from: ['b'], to: 'u', ks: 2, n: N, act: 'none', ins: CB, outs: C },
-  dec: { name: 'decoder conv', from: ['u', 'e'], to: 'd', ks: 3, n: N, act: 'ReLU', ins: 2 * C, outs: C },
-  out: { name: 'output conv', from: ['d'], to: 'y', ks: 1, n: N, act: 'sigmoid', ins: C, outs: 1 },
+  enc: { name: 'Encoder conv', from: ['x'], to: 'e', ks: 3, n: N, act: 'ReLU', ins: 1, outs: C },
+  mid: { name: 'Bottleneck conv', from: ['p'], to: 'b', ks: 3, n: M, act: 'ReLU', ins: C, outs: CB },
+  up: { name: 'Up-conv', from: ['b'], to: 'u', ks: 2, n: N, act: 'none', ins: CB, outs: C },
+  dec: { name: 'Decoder conv', from: ['u', 'e'], to: 'd', ks: 3, n: N, act: 'ReLU', ins: 2 * C, outs: C },
+  out: { name: 'Output conv', from: ['d'], to: 'y', ks: 1, n: N, act: 'sigmoid', ins: C, outs: 1 },
 });
 /** @type {LayerId[]} */
 export const LAYER_IDS = ['enc', 'mid', 'up', 'dec', 'out'];

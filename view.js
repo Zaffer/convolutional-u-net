@@ -99,7 +99,7 @@ const AT = /** @type {Record<string, { x: number, y: number, n: number }>} */ ({
   t0: { x: 286, y: 16, n: N },
 });
 const NAMES = /** @type {Record<MapName, string>} */ ({
-  x: 'input', t: 'target', e: 'encoder', p: 'pooled', b: 'bottleneck', u: 'up-conv', d: 'decoder', y: 'output',
+  x: 'Input', t: 'Target', e: 'Encoder', p: 'Pooled', b: 'Bottleneck', u: 'Up-conv', d: 'Decoder', y: 'Output',
 });
 /** @param {MapName} m @param {number} ch */
 export const mapName = (m, ch) => (m === 'x' || m === 't' || m === 'y' ? m : m + SUB[ch]);
@@ -123,23 +123,23 @@ export function createNetView(root, onPick) {
   };
   const ops = svg('g', { opacity: 0.85 }, root);
   arrow([83, 97, 83, 117]);
-  label(ops, 128, 110, 'conv 3×3 · ReLU');
+  label(ops, 128, 110, 'Conv 3×3 · ReLU');
   arrow([83, 209, 110, 229]);
-  label(ops, 4, 222, 'max-pool 2×2');
+  label(ops, 4, 222, 'Max-pool 2×2');
   arrow([123, 281, 145, 329]);
-  label(ops, 30, 308, 'conv 3×3 · ReLU');
+  label(ops, 30, 308, 'Conv 3×3 · ReLU');
   label(ops, 30, 317, '2 channels → 4', { 'font-size': 7 });
   arrow([268, 338, 290, 326]);
-  label(ops, 300, 345, 'up-conv 2×2');
+  label(ops, 300, 345, 'Up-conv 2×2');
   label(ops, 300, 354, '4 channels → 2', { 'font-size': 7 });
   arrow([283, 239, 283, 219]);
-  label(ops, 290, 224, 'conv 3×3 · reads u and e', { 'font-size': 7 });
+  label(ops, 290, 224, 'Conv 3×3 · reads u and e', { 'font-size': 7 });
   arrow([240, 127, 240, 106]);
-  label(ops, 246, 111, 'conv 1×1 · sigmoid', { 'font-size': 7 });
+  label(ops, 246, 111, 'Conv 1×1 · sigmoid', { 'font-size': 7 });
   // the skip connection: e is copied straight across to the decoder
   const skip = svg('g', { stroke: SKIP, 'stroke-width': 1.5, fill: 'none' }, root);
   svg('polyline', { points: '167,168 197,168', 'stroke-dasharray': '3 2', 'marker-end': 'url(#head)' }, skip);
-  label(root, 170, 162, 'skip', { fill: SKIP, 'font-size': 7 });
+  label(root, 170, 162, 'Skip', { fill: SKIP, 'font-size': 7 });
   label(root, 170, 178, 'copy', { fill: SKIP, 'font-size': 7 });
 
   /** @type {Record<string, SVGRectElement[]>} */
@@ -148,7 +148,7 @@ export function createNetView(root, onPick) {
     const m = /** @type {MapName} */ (key[0]);
     const ch = +key.slice(1);
     // wide maps carry their description beside the first name; the small bottleneck maps carry it below
-    label(root, at.x, at.y - 4, mapName(m, ch) + (ch === 0 && m !== 'b' ? '  ' + NAMES[m] : ''), { 'font-size': 9 });
+    label(root, at.x, at.y - 4, (ch === 0 && m !== 'b' ? NAMES[m] + ' ' : '') + mapName(m, ch), { 'font-size': 9 });
     if (m === 'b' && ch === 0) label(root, at.x, at.y + SMALL + 11, NAMES.b, { 'font-size': 9 });
     cells[key] = grid(root, at.x, at.y, at.n, S, { map: m, ch: String(ch) });
   }
@@ -205,10 +205,10 @@ export function createWeightView(root, onPick) {
     const L = LAYERS[id];
     const B = BLOCKS[id];
     const pitch = L.ks * K + 5; // one kernel and a gap, across and down
-    label(root, B.x, B.y + 8, `${id}: ${L.name}`, { 'font-weight': 'bold' });
+    label(root, B.x, B.y + 8, L.name, { 'font-weight': 'bold' });
     B.cols.forEach((name, i) => label(root, B.x + 18 + i * pitch, B.y + 20, name, { 'font-size': 7 }));
     const bx = B.x + 18 + L.ins * pitch + 4;
-    label(root, bx, B.y + 20, 'bias', { 'font-size': 7 });
+    label(root, bx, B.y + 20, 'Bias', { 'font-size': 7 });
     B.rows.forEach((name, o) => {
       const y = B.y + 24 + o * pitch;
       label(root, B.x, y + 9, name, { 'font-size': 7 });
@@ -280,7 +280,7 @@ export function createTestView(root, count) {
         const set = sets[k];
         if (!set) return;
         [tst.x, tst.y, tst.t].forEach((values, m) => set.maps[m].forEach((rect, j) => paint(rect, values[j], 1)));
-        const text = tst.wrong === 0 ? '✅ every pixel right' : `❌ ${tst.wrong} pixel${tst.wrong === 1 ? '' : 's'} wrong`;
+        const text = tst.wrong === 0 ? '✅ Every pixel right' : `❌ ${tst.wrong} pixel${tst.wrong === 1 ? '' : 's'} wrong`;
         if (set.verdict.textContent !== text) set.verdict.textContent = text;
       });
     },
