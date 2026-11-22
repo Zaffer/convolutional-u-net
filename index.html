@@ -27,24 +27,24 @@
       bottleneck. A learned 2×2 up-convolution brings it back up to 2 channels at full resolution,
       and the <b>skip connection</b> hands the decoder (right) the encoder’s full-resolution map as
       well: coarse context from the bottom, fine detail from across.</p>
-    <p><b>Step through it.</b> ➡ step does one stage: the forward pass layer by layer, then the
+    <p><b>Step through it.</b> ➡️ step does one stage: the forward pass layer by layer, then the
       backward pass layer by layer, then the weight update. Tap any neuron or weight to see the exact
       arithmetic behind it. With 📍 follow on, each step selects a neuron it just computed.</p>
-    <p><b>See why it is shaped like a U.</b> Pick a task, ▶ play until it learns, then switch off one
-      of the two paths into the decoder, press ↺ new weights, and train again. 🔲 outline needs the
+    <p><b>See why it is shaped like a U.</b> Pick a task, ▶️ play until it learns, then switch off one
+      of the two paths into the decoder, press 🔄 new weights, and train again. 🔲 outline needs the
       skip connection; 🔍 big only needs the bottleneck.</p>
     <p><b>If it stalls at 89%</b> on 🔲 outline (about one start in three), the network has learned
       to copy its input. That is most of the way to an outline, and almost no gradient points away
-      from it. Press ↺ new weights for a fresh start.</p>
+      from it. Press 🔄 new weights for a fresh start.</p>
     <p>Source: <a href="https://github.com/Zaffer/convolutional-u-net">github.com/Zaffer/convolutional-u-net</a></p>
   </div>
   <span>
-    <button data-on="click:actions.step" data-disabled="views.stepLocked">➡ step</button>
-    <button data-on="click:actions.sample" data-disabled="views.stepLocked">⏭ finish sample</button>
+    <button data-on="click:actions.step" data-disabled="views.stepLocked">➡️ step</button>
+    <button data-on="click:actions.sample" data-disabled="views.stepLocked">⏭️ finish sample</button>
     <button data-on="click:actions.hundred" data-disabled="views.stepLocked">⏩ 100 samples</button>
-    <button data-on="click:actions.play" data-disabled="views.stepLocked">▶ play</button>
-    <button data-on="click:actions.pause" data-disabled="views.pauseLocked">⏸ pause</button>
-    <button data-on="click:actions.reset">↺ new weights</button>
+    <button data-on="click:actions.play" data-disabled="views.stepLocked">▶️ play</button>
+    <button data-on="click:actions.pause" data-disabled="views.pauseLocked">⏸️ pause</button>
+    <button data-on="click:actions.reset">🔄 new weights</button>
   </span>
   <label>samples <output data-text="views.samples"></output></label>
 </header>
@@ -60,8 +60,8 @@
       </div>
       <p><small><output data-text="views.taskAbout"></output></small></p>
       <div>paths into the decoder:
-        <label><input type="checkbox" switch data-bind="train.skip"> ↪ skip connection</label>
-        <label><input type="checkbox" switch data-bind="train.deep"> ⤵ bottleneck</label>
+        <label><input type="checkbox" switch data-bind="train.skip"> ↪️ skip connection</label>
+        <label><input type="checkbox" switch data-bind="train.deep"> ⤵️ bottleneck</label>
       </div>
       <div><label for="alphaIn">learning rate α <output data-text="views.alpha"></output><br>
         <input id="alphaIn" type="range" min="0.0005" max="0.02" step="0.0005" data-bind="train.alpha"></label></div>
@@ -73,7 +73,7 @@
       <legend>view</legend>
       <div>colour by:
         <label><input type="radio" name="mode" value="value" data-bind="ui.mode"> 🔵 value</label>
-        <label><input type="radio" name="mode" value="grad" data-bind="ui.mode"> ∇ gradient</label>
+        <label><input type="radio" name="mode" value="grad" data-bind="ui.mode"> 📉 gradient</label>
       </div>
       <div><label><input type="checkbox" data-bind="ui.field"> 🎯 receptive field</label></div>
       <div><label><input type="checkbox" data-bind="ui.follow"> 📍 follow each step</label></div>
@@ -82,11 +82,11 @@
 
     <fieldset id="keyBox">
       <legend>key</legend>
-      <div><span style="color:#2a9df4">■</span> positive, <span style="color:#f0605a">■</span> negative; stronger colour, bigger number. Blank: not computed yet.</div>
+      <div>🟦 positive, 🟥 negative; stronger colour, bigger number. Blank: not computed yet.</div>
       <div>▣ selected · ⬚ dashed: what it reads (forward) or feeds (backward)</div>
       <div>🎯 receptive field, every input that can reach the selected neuron:
-        <span style="color:#a970ff">□</span> through the bottleneck,
-        <span style="color:#e89a1c">□</span> through the skip connection, both colours: both.</div>
+        🟪 through the bottleneck,
+        🟧 through the skip connection, both colours: both.</div>
       <div>Each map is scaled to its own largest value; the inspector has the exact numbers.</div>
     </fieldset>
   </div>

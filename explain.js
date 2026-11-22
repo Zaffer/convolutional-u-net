@@ -132,7 +132,7 @@ function valueText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type
     const Q = c >> 1;
     const a = r & 1;
     const cc = c & 1;
-    if (T.cut.deep) return '✂ the bottleneck path is cut: the decoder gets 0 here\ninstead of the up-conv’s output.';
+    if (T.cut.deep) return '✂️ the bottleneck path is cut: the decoder gets 0 here\ninstead of the up-conv’s output.';
     const lines = [
       `The up-conv works backwards from a conv: each bottleneck`,
       `position (${R},${Q}) writes into a 2×2 block of u, rows ${2 * R}–${2 * R + 1},`,
@@ -190,7 +190,7 @@ function convText(/** @type {LayerId} */ id, /** @type {number} */ o, /** @type 
       const src = recv[i];
       let s = 0;
       const note =
-        id === 'dec' ? (m === 'u' ? (T.cut.deep ? '  ✂ cut: zeros' : '  bottleneck path') : T.cut.skip ? '  ✂ cut: zeros' : '  skip connection') : '';
+        id === 'dec' ? (m === 'u' ? (T.cut.deep ? '  ✂️ cut: zeros' : '  bottleneck path') : T.cut.skip ? '  ✂️ cut: zeros' : '  skip connection') : '';
       lines.push('', `from ${mapName(m, ch)}${note}`, `   window                   kernel ${wName(id, o, i)}`);
       for (let dr = -h; dr <= h; dr++) {
         const win = [];
@@ -229,7 +229,7 @@ function convText(/** @type {LayerId} */ id, /** @type {number} */ o, /** @type 
   else if (Math.abs(out - (L.act === 'ReLU' ? Math.max(0, pre) : 1 / (1 + Math.exp(-pre)))) > 1e-9) lines.push('', '(mismatch: the weights changed since this pass)');
   if (L.to === 'y') {
     const t = T.t[0][r * n + c];
-    lines.push('', `target t = ${t}: ${Math.round(out) === t ? '✓ right' : '✗ wrong'} (rounds to ${Math.round(out)})`);
+    lines.push('', `target t = ${t}: ${Math.round(out) === t ? '✅ right' : '❌ wrong'} (rounds to ${Math.round(out)})`);
   }
   return lines.join('\n');
 }
@@ -302,7 +302,7 @@ function gradText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type 
     return [intro, `d${SUB[ch]} feeds only y at this pixel, through ${wName('out', 0, ch)}:`, ...termLines(terms), `∂L/∂d${SUB[ch]} = ${v3(G.d[ch][j])}`, '', reluGate(G.dPre[ch][j], T.dPre[ch][j], `d${SUB[ch]}`)].join('\n');
   }
   if (m === 'u') {
-    if (T.cut.deep) return `${intro}\n✂ the bottleneck path is cut: u feeds nothing, so ∂L/∂u = 0.`;
+    if (T.cut.deep) return `${intro}\n✂️ the bottleneck path is cut: u feeds nothing, so ∂L/∂u = 0.`;
     const terms = backTerms('dec', ch, r, c, ctx);
     return [
       intro,
@@ -357,7 +357,7 @@ function gradText(/** @type {MapName} */ m, /** @type {number} */ ch, /** @type 
     `1. the pool: p${SUB[ch]}${at(R, Q)} took the max of its 2×2 block,`,
     won ? `   and this neuron won it, so it gets all of ∂L/∂p${SUB[ch]}${at(R, Q)} = ${v3(G.eFromPool[ch][j])}` : `   and this neuron did not win it, so it gets 0`,
     '',
-    T.cut.skip ? '2. the skip connection: ✂ cut, so 0' : '2. the skip connection: decoder neurons read it directly.\n   each term: δ of that d neuron × its weight',
+    T.cut.skip ? '2. the skip connection: ✂️ cut, so 0' : '2. the skip connection: decoder neurons read it directly.\n   each term: δ of that d neuron × its weight',
     ...(T.cut.skip ? [] : termLines(skipTerms, 6)),
     T.cut.skip ? '' : `   from the skip: ${v3(G.skip[ch][j])}`,
     '',
@@ -434,7 +434,7 @@ function explainWeight(/** @type {Exclude<Selection, { kind: 'neuron' }>} */ sel
     `total ${isBias ? '∂L/∂b' : '∂L/∂w'} = ${v3(g)}`,
     '',
     `update: w − α·∂L/∂w = ${f4(was)} − ${alpha} × ${g < 0 ? `(${v3(g)})` : g.toFixed(3)} = ${f4(was - alpha * g)}`,
-    updated ? `✓ applied: it was ${f4(was)}, it is now ${f4(now)}` : 'applied at stage ⑬',
+    updated ? `✅ applied: it was ${f4(was)}, it is now ${f4(now)}` : 'applied at stage ⑬',
   );
   return lines.join('\n');
 }

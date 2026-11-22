@@ -19,7 +19,7 @@ sample at a time by plain gradient descent, w ← w − α·∂L/∂w, on binary
 
 ## What to do with it
 
-- **➡ step** walks one sample through 14 stages: the forward pass layer by layer, the backward
+- **➡️ step** walks one sample through 14 stages: the forward pass layer by layer, the backward
   pass layer by layer, then the update. Tap any neuron or weight and the inspector writes out the
   exact arithmetic: the 3×3 windows times the kernels, the sum, the bias, the ReLU; on the way
   back, every term of every gradient; for a weight, its gradient summed over every position it
@@ -29,9 +29,9 @@ sample at a time by plain gradient descent, w ← w − α·∂L/∂w, on binary
 - **Why the U.** Each task draws one square. 🔍 big only needs to see the whole square, so it
   needs the bottleneck: cut it and every run stalls near 95% of pixels. 🔲 outline needs fine
   detail: cut the skip and it gets to about 97% but rarely every pixel. Switch either path off,
-  press ↺ new weights, ▶ play, and watch.
+  press 🔄 new weights, ▶️ play, and watch.
 - About one start in three on 🔲 outline settles on copying its input (89% of pixels right)
-  and stays there. ↺ new weights.
+  and stays there. 🔄 new weights.
 
 ## Files
 

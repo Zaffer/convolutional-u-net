@@ -280,7 +280,7 @@ export function createTestView(root, count) {
         const set = sets[k];
         if (!set) return;
         [tst.x, tst.y, tst.t].forEach((values, m) => set.maps[m].forEach((rect, j) => paint(rect, values[j], 1)));
-        const text = tst.wrong === 0 ? '✓ every pixel right' : `✗ ${tst.wrong} pixel${tst.wrong === 1 ? '' : 's'} wrong`;
+        const text = tst.wrong === 0 ? '✅ every pixel right' : `❌ ${tst.wrong} pixel${tst.wrong === 1 ? '' : 's'} wrong`;
         if (set.verdict.textContent !== text) set.verdict.textContent = text;
       });
     },
