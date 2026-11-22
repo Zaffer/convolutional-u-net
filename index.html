@@ -31,6 +31,8 @@
     <p><b>See why it is shaped like a U.</b> Pick a task, ▶ play until it learns, then switch off one
       of the two paths into the decoder, press ↺ new weights, and train again. 🔲 outline needs the
       skip connection; 🔍 big only needs the bottleneck.</p>
+    <p><b>If it stalls</b> with both paths on (about one start in five on 🔲 outline), some ReLUs have
+      gone dead: the inspector shows their gradient stopping. Press ↺ new weights for a fresh start.</p>
     <p>Source: <a href="https://github.com/Zaffer/convolutional-u-net">github.com/Zaffer/convolutional-u-net</a></p>
   </div>
   <span>
